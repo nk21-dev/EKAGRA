@@ -1,11 +1,10 @@
 /**
  * EKAGRA — Authentication Client Engine
- * Handles theme toggling, form validations, API interactions, and user feedback.
+ * Handles background video, form validations, API interactions, and user feedback.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   initAuthBackgroundVideo();
-  initTheme();
   initPasswordToggles();
   initLoginForm();
   initSignupForm();
@@ -14,29 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuthSwitchLinks();
   initAuthSessionCheck();
 });
-
-// 1. Theme Management (Dark & Light Mode)
-function initTheme() {
-  const savedTheme = localStorage.getItem('ekagra_theme');
-  const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-  const initialTheme = savedTheme || (prefersLight ? 'light' : 'dark');
-
-  setTheme(initialTheme);
-
-  const toggleBtn = document.getElementById('themeToggleBtn');
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', () => {
-      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      setTheme(newTheme);
-      localStorage.setItem('ekagra_theme', newTheme);
-    });
-  }
-}
-
-function setTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-}
 
 // 2. Password Visibility Toggles
 function initPasswordToggles() {
