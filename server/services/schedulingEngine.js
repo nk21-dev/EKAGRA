@@ -896,8 +896,12 @@ function findNextAvailableSlotSync(db, userId, taskId, options = {}) {
   let startDateStr = options.startDate;
   let minStartMinsOnFirstDay = null;
 
-  if (!startDateStr) {
-    if (existingBlock && existingBlock.scheduled_date >= todayStr) {
+  if (startDateStr) {
+    if (existingBlock && existingBlock.scheduled_date === startDateStr) {
+      minStartMinsOnFirstDay = parseTimeToMinutes(existingBlock.end_time);
+    }
+  } else {
+    if (existingBlock && existingBlock.scheduled_date) {
       startDateStr = existingBlock.scheduled_date;
       minStartMinsOnFirstDay = parseTimeToMinutes(existingBlock.end_time);
     } else {
@@ -968,8 +972,12 @@ async function findNextAvailableSlotAsync(db, userId, taskId, options = {}) {
   let startDateStr = options.startDate;
   let minStartMinsOnFirstDay = null;
 
-  if (!startDateStr) {
-    if (existingBlock && existingBlock.scheduled_date >= todayStr) {
+  if (startDateStr) {
+    if (existingBlock && existingBlock.scheduled_date === startDateStr) {
+      minStartMinsOnFirstDay = parseTimeToMinutes(existingBlock.end_time);
+    }
+  } else {
+    if (existingBlock && existingBlock.scheduled_date) {
       startDateStr = existingBlock.scheduled_date;
       minStartMinsOnFirstDay = parseTimeToMinutes(existingBlock.end_time);
     } else {
@@ -1040,7 +1048,7 @@ function rescheduleTaskSync(db, userId, taskId, newDate = null, newStartTime = n
   const duration = (existingBlock && existingBlock.allocated_minutes) ? existingBlock.allocated_minutes : (task.duration_minutes || 30);
 
   if (!newDate || !newStartTime) {
-    const nextSlot = findNextAvailableSlotSync(db, userId, taskId);
+    const nextSlot = findNextAvailableSlotSync(db, userId, taskId, existingBlock ? { startDate: existingBlock.scheduled_date } : {});
     if (!nextSlot.success) {
       throw new Error(nextSlot.error || 'No free routine window available in the next 7 days.');
     }
@@ -1139,7 +1147,7 @@ async function rescheduleTaskAsync(db, userId, taskId, newDate = null, newStartT
   const duration = (existingBlock && existingBlock.allocated_minutes) ? existingBlock.allocated_minutes : (task.duration_minutes || 30);
 
   if (!newDate || !newStartTime) {
-    const nextSlot = await findNextAvailableSlotAsync(db, userId, taskId);
+    const nextSlot = await findNextAvailableSlotAsync(db, userId, taskId, existingBlock ? { startDate: existingBlock.scheduled_date } : {});
     if (!nextSlot.success) {
       throw new Error(nextSlot.error || 'No free routine window available in the next 7 days.');
     }

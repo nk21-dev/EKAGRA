@@ -4,6 +4,7 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  initAuthBackgroundVideo();
   initTheme();
   initPasswordToggles();
   initLoginForm();
@@ -379,4 +380,48 @@ function initAuthSessionCheck() {
       checkSession();
     }
   });
+}
+
+// 8. Continuous Slow-Motion Auth Background Video
+function initAuthBackgroundVideo() {
+  const video = document.getElementById('authBgVideo');
+  if (!video) return;
+
+  const configureAndPlay = () => {
+    try {
+      video.muted = true;
+      video.loop = true;
+      video.defaultPlaybackRate = 0.7;
+      video.playbackRate = 0.7;
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Retry muted autoplay
+          video.muted = true;
+          video.play().catch(() => {});
+        });
+      }
+    } catch (e) {}
+  };
+
+  video.addEventListener('loadedmetadata', configureAndPlay);
+  video.addEventListener('play', () => {
+    if (video.playbackRate !== 0.7) {
+      video.playbackRate = 0.7;
+    }
+  });
+
+  // Ensure continuous playback on tab switch or bfcache restore
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      configureAndPlay();
+    }
+  });
+
+  window.addEventListener('pageshow', () => {
+    configureAndPlay();
+  });
+
+  // Initial playback setup
+  configureAndPlay();
 }

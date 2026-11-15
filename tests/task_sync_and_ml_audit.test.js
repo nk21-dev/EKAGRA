@@ -182,6 +182,7 @@ test('EKAGRA Task Sync and ML Audit Regression Suite', async (t) => {
     assert.match(errData.error, /Cannot reschedule into a fixed routine commitment/i);
 
     // Rescheduling into available slot (17:00) must succeed
+    // Rescheduling into available slot (19:00) must succeed without overlapping task 2 (17:00-17:45)
     const resOk = await fetch(`${baseUrl}/api/schedule/reschedule-task`, {
       method: 'POST',
       headers: {
@@ -191,7 +192,7 @@ test('EKAGRA Task Sync and ML Audit Regression Suite', async (t) => {
       body: JSON.stringify({
         taskId: taskId1,
         newDate: '2026-11-16',
-        newStartTime: '17:00'
+        newStartTime: '19:00'
       })
     });
     assert.equal(resOk.status, 200);
