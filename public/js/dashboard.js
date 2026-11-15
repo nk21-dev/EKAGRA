@@ -169,6 +169,7 @@ const Store = {
     lastCreatedGoalId: null
   },
 
+  isLoaded: false,
   listeners: [],
 
   subscribe(listener) {
@@ -188,6 +189,7 @@ const Store = {
   // Save state to backend database (bound strictly to authenticated session)
   saveTimer: null,
   saveDebounced() {
+    if (!this.isLoaded) return;
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(async () => {
       try {
@@ -211,16 +213,19 @@ const Store = {
 
   // Load initial data from backend API
   async init() {
+    // 0. Render real client date and time greeting immediately
+    renderCurrentDateAndGreeting();
+
     try {
       // 1. Fetch authenticated user session
       const authRes = await fetch('/api/auth/me');
-      if (!authRes.ok) {
-        window.location.href = '/login';
+      if (authRes.status === 401 || !authRes.ok) {
+        window.location.replace('/login');
         return;
       }
       const authData = await authRes.json();
       if (!authData || !authData.user) {
-        window.location.href = '/login';
+        window.location.replace('/login');
         return;
       }
 
@@ -230,6 +235,10 @@ const Store = {
         id: authData.user.id,
         created_at: authData.user.created_at
       };
+
+      // Hydrate user profile immediately into state and top bar
+      this.state.user = activeUser;
+      renderTopBar(this.state);
 
       // 2. Fetch user-isolated dashboard state, today's schedule, and insights in parallel
       let dashData = { goals: [], tasks: [], routines: [], metrics: null, insights: [], activities: [] };
@@ -302,6 +311,7 @@ const Store = {
         user_preferences: dashData.preferences || { notify_tasks: true, notify_goals: true, notify_weekly: true }
       };
 
+      this.isLoaded = true;
       this.notify();
       if (typeof window.updateGlobalRoutineBanner === 'function') {
         window.updateGlobalRoutineBanner(this.state);
@@ -328,8 +338,10 @@ const Store = {
     } catch (err) {
       console.error('Failed to initialize dashboard store:', err);
       // Fallback: Still render the dashboard safely with available user and empty state
+      this.isLoaded = true;
       this.state = {
         ...this.state,
+        user: this.state.user && this.state.user.name ? this.state.user : { name: 'User', email: '' },
         isColdStart: true,
         goals: [],
         tasks: [],
@@ -395,11 +407,15 @@ window.Store = Store;
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  renderCurrentDateAndGreeting();
   initTheme();
   initSidebarRouter();
   initTopBar();
   initModals();
   initDeveloperConsole();
+
+  // Render topbar with real client date and initial time greeting immediately
+  renderTopBar(Store.state);
 
   // Subscribe UI renders to state changes
   Store.subscribe((state) => {
@@ -528,8 +544,37 @@ function initTopBar() {
   }
 }
 
+function renderCurrentDateAndGreeting() {
+  const hour = new Date().getHours();
+  let timeGreeting = 'Good Morning';
+  let emoji = '☀️';
+  if (hour >= 12 && hour < 17) {
+    timeGreeting = 'Good Afternoon';
+    emoji = '🌤️';
+  } else if (hour >= 17) {
+    timeGreeting = 'Good Evening';
+    emoji = '🌙';
+  }
+
+  const titleEl = document.getElementById('topbarGreetingTitle');
+  if (titleEl && (!titleEl.dataset.hasUser || !titleEl.textContent.includes(','))) {
+    titleEl.textContent = `${timeGreeting} ${emoji}`;
+  }
+
+  const dateEl = document.getElementById('topbarDateText');
+  if (dateEl) {
+    const now = new Date();
+    dateEl.textContent = now.toLocaleDateString(undefined, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+  }
+}
+
 function renderTopBar(state) {
-  const user = state.user;
+  const user = state.user || {};
   const userName = user.name || 'User';
 
   const hour = new Date().getHours();
@@ -545,7 +590,8 @@ function renderTopBar(state) {
 
   const titleEl = document.getElementById('topbarGreetingTitle');
   if (titleEl) {
-    titleEl.innerHTML = `${timeGreeting}, ${escapeHtml(userName)} ${emoji} <span class="greeting-sub">— Keep going. You're building your future.</span>`;
+    titleEl.dataset.hasUser = 'true';
+    titleEl.innerHTML = `${timeGreeting}, ${escapeHtml(userName)} ${emoji}`;
   }
 
   const dateEl = document.getElementById('topbarDateText');
@@ -966,11 +1012,11 @@ function renderHome(state) {
     }
   }
 
-  // 3. Today's Schedule Card: Keep ONLY ONE ⚡ Auto-Schedule Today button!
+  // 3. Today's Schedule Card: Keep ⚡ Auto-Schedule Today button accessible
   const homeAutoBtn = document.getElementById('homeAutoScheduleBtn');
   if (homeAutoBtn) {
-    // Show in header ONLY when scheduled blocks exist; otherwise hide to prevent duplicate button with empty state!
-    homeAutoBtn.style.display = hasScheduledBlocks ? 'inline-flex' : 'none';
+    // Show in header when scheduled blocks exist OR when tasks are waiting to be scheduled
+    homeAutoBtn.style.display = (hasScheduledBlocks || tasks.length > 0) ? 'inline-flex' : 'none';
   }
 
   const timelineBox = document.getElementById('homeTimelineList');
@@ -1006,11 +1052,16 @@ function renderHome(state) {
         `;
       }).join('');
     } else if (tasks.length > 0) {
+      const routineIncomplete = Store.state.routine_coverage_incomplete;
+      const subtitleText = routineIncomplete
+        ? "Complete your 24-hour routine schedule first, then click '⚡ Auto-Schedule Today' to build your plan."
+        : "Click '⚡ Auto-Schedule Today' in the card header above (or below) to build your priority execution plan.";
       timelineBox.innerHTML = `
         <div class="schedule-starter-box" style="padding: 24px 16px; text-align: center;">
           <div style="font-size: 1.4rem; margin-bottom: 6px;">⚡</div>
           <div class="schedule-starter-title" style="font-size: 0.95rem; font-weight: 700;">Ready to Schedule</div>
-          <p class="schedule-starter-body" style="font-size: 0.82rem; margin: 4px 0 0 0; color: var(--text-secondary);">Click '⚡ Auto-Schedule Today' in the card header above to build your priority execution plan.</p>
+          <p class="schedule-starter-body" style="font-size: 0.82rem; margin: 4px 0 12px 0; color: var(--text-secondary);">${subtitleText}</p>
+          <button type="button" class="btn-primary-emerald" style="padding: 6px 14px; font-size: 0.8rem; margin: 0 auto;" onclick="triggerAutoSchedule()">⚡ Auto-Schedule Today</button>
         </div>
       `;
     } else {

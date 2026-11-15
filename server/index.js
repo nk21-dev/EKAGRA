@@ -25,7 +25,7 @@ getDatabase();
 app.use(async (req, res, next) => {
   try {
     const db = getDatabase();
-    if (db && db.isTurso) {
+    if (db) {
       await ensureMigrations(db);
     }
     next();

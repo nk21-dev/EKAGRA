@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initSignupForm();
   initForgotPasswordForm();
   initResetPasswordForm();
+  initAuthSwitchLinks();
+  initAuthSessionCheck();
 });
 
 // 1. Theme Management (Dark & Light Mode)
@@ -118,8 +120,8 @@ function initLoginForm() {
         throw new Error(data.error || 'Failed to sign in.');
       }
 
-      // Success: redirect to dashboard
-      window.location.href = '/dashboard';
+      // Success: redirect to dashboard replacing login in history
+      window.location.replace('/dashboard');
     } catch (err) {
       showFeedback('loginFeedback', err.message, 'error');
       setButtonLoading(submitBtn, false, '', 'Sign In');
@@ -177,8 +179,8 @@ function initSignupForm() {
         throw new Error(data.error || 'Failed to create account.');
       }
 
-      // Success: redirect to dashboard
-      window.location.href = '/dashboard';
+      // Success: redirect to dashboard replacing login in history
+      window.location.replace('/dashboard');
     } catch (err) {
       showFeedback('signupFeedback', err.message, 'error');
       setButtonLoading(submitBtn, false, '', 'Create Account');
@@ -301,6 +303,48 @@ function initResetPasswordForm() {
     } catch (err) {
       showFeedback('resetFeedback', err.message, 'error');
       setButtonLoading(submitBtn, false, '', 'Reset Password');
+    }
+  });
+}
+
+// 6. Seamless Navigation Between Login & Signup Without History Stacking
+function initAuthSwitchLinks() {
+  const switchLinks = document.querySelectorAll('.auth-switch-text a');
+  switchLinks.forEach((link) => {
+    link.addEventListener('click', (e) => {
+      const href = link.getAttribute('href');
+      if (href && (href.startsWith('/login') || href.startsWith('/signup'))) {
+        e.preventDefault();
+        window.location.replace(href);
+      }
+    });
+  });
+}
+
+// 7. Check Active Session on Auth Pages & Handle Browser Back
+function initAuthSessionCheck() {
+  const checkSession = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.user) {
+          // If already authenticated and visiting /login or /signup, redirect to landing page
+          window.location.replace('/');
+        }
+      }
+    } catch (e) {
+      // Unauthenticated or network error, safely stay on auth page
+    }
+  };
+
+  // Run on page load
+  checkSession();
+
+  // Run on bfcache navigation (e.g., browser Back button pressed)
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      checkSession();
     }
   });
 }
