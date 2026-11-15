@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EKAGRA — ONE FOCUS. MANY GOALS.</title>
+  <meta name="description" content="E K Ʌ G R Ʌ — ONE FOCUS. MANY GOALS. Ultra-clean, organic luxury botanical execution platform.">
+  
+  <!-- Premium Modern Sans-Display Fonts: Cabinet Grotesk, Satoshi, Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://api.fontshare.com">
+  <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&f[]=satoshi@700,800,900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Favicon matching Growth Emblem -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='5' r='3' fill='%23C084FC'/%3E%3Cpath d='M14.5 28C14.5 28 5 23 5 14C5 10 9.5 11.5 14.5 16Z' fill='%2306B6D4'/%3E%3Cpath d='M17.5 28C17.5 28 27 23 27 14C27 10 22.5 11.5 17.5 16Z' fill='%238B5CF6'/%3E%3C/svg%3E">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="alabaster-canvas">
+  
+  <!-- Subtle Botanical Depth & Ambient Glow Margins -->
+  <div class="ambient-glow glow-nw"></div>
+  <div class="ambient-glow glow-ne"></div>
+  <div class="ambient-glow glow-se"></div>
+  <div class="botanical-diffuse-light"></div>
+
+  <!-- Micro Holographic Particles & Suspended Botanical Accents -->
+  <div class="particles-field" id="particlesField"></div>
+  
+  <!-- Ambient Falling Leaves Particle Field (Full-Viewport Fixed Layer) -->
+  <div class="falling-leaves-field" id="fallingLeavesField" aria-hidden="true"></div>
+
+  <!-- FLOATING FROSTED GLASS PILL NAVBAR -->
+  <header class="navbar-wrapper">
+    <nav class="frosted-glass-pill navbar" id="navbar">
+      
+      <!-- Left: Logo Lockup -->
+      <a href="#" class="brand-lockup" id="navBrand">
+        <div class="growth-emblem-wrap">
+          <svg class="growth-emblem-svg" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <!-- Left Petal: Cyan to Teal Gradient -->
+              <linearGradient id="leftPetalGrad" x1="4" y1="32" x2="18" y2="12" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#06B6D4" />
+                <stop offset="100%" stop-color="#14B8A6" />
+              </linearGradient>
+
+              <!-- Right Petal: Vivid Purple to Indigo Gradient -->
+              <linearGradient id="rightPetalGrad" x1="20" y1="12" x2="34" y2="32" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#8B5CF6" />
+                <stop offset="100%" stop-color="#4F46E5" />
+              </linearGradient>
+
+              <!-- Lavender Crown Dot Gradient -->
+              <linearGradient id="crownDotGrad" x1="16" y1="3" x2="22" y2="9" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#E9D5FF" />
+                <stop offset="100%" stop-color="#A855F7" />
+              </linearGradient>
+
+              <!-- Emblem Glow Filter -->
+              <filter id="emblemGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Soft ambient back-glow for emblem -->
+            <circle cx="19" cy="20" r="14" fill="#10B981" opacity="0.15" filter="blur(6px)" id="emblemBackGlow" />
+
+            <!-- Soft Lavender Circular Dot Crown -->
+            <circle cx="19" cy="6.5" r="3.2" fill="url(#crownDotGrad)" class="emblem-crown-dot" />
+
+            <!-- Left Wing/Petal (Cyan-Teal) with precise split separation -->
+            <path d="M17.4 31.5C17.4 31.5 6 26.5 6 15.5C6 11 11.5 12.8 17.2 18.2C17.4 22.5 17.4 28.5 17.4 31.5Z" 
+                  fill="url(#leftPetalGrad)" 
+                  class="emblem-left-wing" />
+
+            <!-- Right Wing/Petal (Vivid Purple/Indigo) with central light split -->
+            <path d="M20.6 31.5C20.6 31.5 32 26.5 32 15.5C32 11 26.5 12.8 20.8 18.2C20.6 22.5 20.6 28.5 20.6 31.5Z" 
+                  fill="url(#rightPetalGrad)" 
+                  class="emblem-right-wing" />
+
+            <!-- Central Light Split Filament -->
+            <path d="M19 12V33" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round" opacity="0.9" class="emblem-split-line"/>
+          </svg>
+        </div>
+        <span class="nav-brand-text">EKAGRA</span>
+      </a>
+
+      <!-- Center Navigation Links (Strictly NO Pricing) -->
+      <ul class="nav-menu">
+        <li><a href="#how-it-works" class="nav-item">How It Works</a></li>
+        <li><a href="#features" class="nav-item">Features</a></li>
+        <li><a href="#about" class="nav-item">About</a></li>
+      </ul>
+
+      <!-- Right Action Pill Buttons -->
+      <div class="nav-actions">
+        <a href="/login" class="btn-signin-glass">Sign In</a>
+        <a href="/signup" class="btn-signup-solid">Sign Up</a>
+      </div>
+
+    </nav>
+  </header>
+
+  <!-- MAIN HERO SECTION -->
+  <main class="hero-stage">
+    <div class="hero-content-grid">
+      
+      <!-- LEFT HERO: Ultra-Clean, High-Impact Typography & Pure Negative Space -->
+      <section class="hero-typography-panel">
+        
+        <!-- Brand Title: Refined Modern Sans-Display with Per-Letter Spring Physics -->
+        <div class="title-container" id="brandTitleContainer">
+          <h1 class="brand-display" id="brandDisplayTitle" aria-label="EKAGRA">
+            <span class="brand-char" data-char="E">E</span>
+            <span class="brand-char" data-char="K">K</span>
+            <span class="brand-char" data-char="A">A</span>
+            <span class="brand-char" data-char="G">G</span>
+            <span class="brand-char" data-char="R">R</span>
+            <span class="brand-char" data-char="A">A</span>
+          </h1>
+
+          <!-- Ambient Iridescent Mint-to-Cyan Micro-Glow Underlayer -->
+          <div class="mint-cyan-halo" id="mintCyanHalo"></div>
+        </div>
+
+        <!-- Tagline: Proportionate Horizontal Line without Distortion -->
+        <div class="tagline-wrap">
+          <p class="tagline-text">ONE FOCUS. MANY GOALS.</p>
+        </div>
+
+        <!-- Primary Action Button Below Tagline -->
+        <div class="hero-cta-wrap">
+          <a href="#how-it-works" class="btn-hero-primary" id="heroPrimaryCta">
+            <span class="btn-cta-text">Start with EKAGRA</span>
+            <span class="btn-arrow" aria-hidden="true">→</span>
+          </a>
+        </div>
+
+        <!-- STRICT NEGATIVE SPACE: Pure, serene luxury breathing room -->
+        <div class="hero-serene-space"></div>
+
+      </section>
+
+      <!-- RIGHT HERO: Antigravity Floating Feature Slab with Ray-Traced Glass -->
+      <section class="hero-antigravity-panel" id="antigravityPanel">
+        
+        <!-- Suspended Floating Leaves in Zero Gravity -->
+        <div class="suspended-leaf leaf-top-right">
+          <svg viewBox="0 0 40 40" fill="none">
+            <path d="M8 32 C12 18 26 8 36 6 C36 20 22 34 8 32 Z" fill="#2D5A46" opacity="0.6"/>
+            <path d="M8 32 C18 24 28 14 36 6" stroke="#4ADE80" stroke-width="1" opacity="0.4"/>
+          </svg>
+        </div>
+        <div class="suspended-leaf leaf-bottom-left">
+          <svg viewBox="0 0 36 36" fill="none">
+            <path d="M6 30 C10 16 22 8 32 6 C32 18 20 30 6 30 Z" fill="#1B4D3E" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="suspended-leaf leaf-bottom-right">
+          <svg viewBox="0 0 28 28" fill="none">
+            <path d="M4 24 C8 12 18 6 26 4 C26 14 16 24 4 24 Z" fill="#10B981" opacity="0.35"/>
+          </svg>
+        </div>
+
+        <!-- Holographic Micro Orbit Particles -->
+        <div class="holo-orb orb-1"></div>
+        <div class="holo-orb orb-2"></div>
+        <div class="holo-orb orb-3"></div>
+
+        <!-- The 3D Float Viewport & Bobbing Container -->
+        <div class="slab-perspective-viewport">
+          <div class="slab-harmonic-bobber" id="slabBobber">
+            <div class="glass-feature-slab" id="glassSlab">
+              
+              <!-- Ray-Traced Refractive Glass Borders & Mint Luminescence Edge -->
+              <div class="slab-refraction-sheen"></div>
+              <div class="slab-mint-glow-edge"></div>
+              <div class="slab-specular-highlight"></div>
+
+              <!-- 2x2 Grid of 4 Glowing Feature Modules -->
+              <div class="slab-grid">
+                
+                <!-- MODULE 1: Multi-Goal Time Allocation -->
+                <div class="feature-module mod-allocation" id="modAllocation">
+                  <div class="module-header">
+                    <span class="mod-indicator ind-cyan"></span>
+                    <h3 class="mod-title">Multi-Goal Time Allocation</h3>
+                  </div>
+                  
+                  <!-- Stacked Progress Bars: Cyan, Amber, Purple -->
+                  <div class="stacked-allocation-bars">
+                    <div class="alloc-row">
+                      <div class="bar-meta">
+                        <span class="bar-label">AI / Research</span>
+                        <span class="bar-value">40%</span>
+                      </div>
+                      <div class="bar-track">
+                        <div class="bar-fill fill-cyan" style="width: 72%;"></div>
+                      </div>
+                    </div>
+
+                    <div class="alloc-row">
+                      <div class="bar-meta">
+                        <span class="bar-label">Core Algorithms</span>
+                        <span class="bar-value">35%</span>
+                      </div>
+                      <div class="bar-track">
+                        <div class="bar-fill fill-amber" style="width: 58%;"></div>
+                      </div>
+                    </div>
+
+                    <div class="alloc-row">
+                      <div class="bar-meta">
+                        <span class="bar-label">Production App</span>
+                        <span class="bar-value">25%</span>
+                      </div>
+                      <div class="bar-track">
+                        <div class="bar-fill fill-purple" style="width: 84%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- MODULE 2: Fixed Routine Mapping -->
+                <div class="feature-module mod-routine" id="modRoutine">
+                  <div class="module-header">
+                    <span class="mod-indicator ind-emerald"></span>
+                    <h3 class="mod-title">Fixed Routine Mapping</h3>
+                  </div>
+
+                  <!-- Minimalist Daily Time Grid with Highlighted Emerald Block -->
+                  <div class="daily-time-grid">
+                    <div class="grid-days">
+                      <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span>
+                    </div>
+                    <div class="grid-cells">
+                      <div class="grid-row">
+                        <span class="time-label">09:00</span>
+                        <div class="cell routine-fixed"></div>
+                        <div class="cell routine-fixed"></div>
+                        <div class="cell routine-fixed"></div>
+                        <div class="cell routine-fixed"></div>
+                        <div class="cell routine-fixed"></div>
+                      </div>
+                      <div class="grid-row">
+                        <span class="time-label">14:00</span>
+                        <div class="cell"></div>
+                        <div class="cell"></div>
+                        <!-- Highlighted Carved Emerald Focus Block -->
+                        <div class="cell focus-highlighted-block">
+                          <span class="focus-pulse-dot"></span>
+                        </div>
+                        <div class="cell"></div>
+                        <div class="cell"></div>
+                      </div>
+                      <div class="grid-row">
+                        <span class="time-label">18:00</span>
+                        <div class="cell routine-gym"></div>
+                        <div class="cell"></div>
+                        <div class="cell routine-gym"></div>
+                        <div class="cell"></div>
+                        <div class="cell routine-gym"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- MODULE 3: Zero-Friction Offline Execution -->
+                <div class="feature-module mod-offline" id="modOffline">
+                  <div class="module-header">
+                    <span class="mod-indicator ind-mint"></span>
+                    <h3 class="mod-title">Zero-Friction Offline Execution</h3>
+                  </div>
+
+                  <!-- Circular Glass Badge with an Emerald Checkmark -->
+                  <div class="offline-badge-container">
+                    <div class="circular-glass-badge" id="offlineCheckBadge" role="button" tabindex="0" title="Tap to toggle zero-friction verification">
+                      <div class="badge-glass-rim"></div>
+                      <div class="badge-emerald-core">
+                        <svg class="check-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                      </div>
+                      <div class="badge-glow-ring"></div>
+                    </div>
+                    <div class="offline-meta-text">
+                      <span class="offline-status">Active Session Verified</span>
+                      <span class="offline-hint">Zero countdown anxiety</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- MODULE 4: Self-Healing Schedule Engine -->
+                <div class="feature-module mod-healing" id="modHealing">
+                  <div class="module-header">
+                    <span class="mod-indicator ind-neon"></span>
+                    <h3 class="mod-title">Self-Healing Schedule Engine</h3>
+                  </div>
+
+                  <!-- Radial Arc Ring Rebalancing in Mint Glow -->
+                  <div class="healing-radial-container">
+                    <div class="radial-ring-box">
+                      <svg class="radial-arc-svg" viewBox="0 0 110 110">
+                        <defs>
+                          <linearGradient id="mintArcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#34D399" />
+                            <stop offset="60%" stop-color="#10B981" />
+                            <stop offset="100%" stop-color="#059669" />
+                          </linearGradient>
+                          <filter id="arcGlowFilter" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3.5" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                          </filter>
+                        </defs>
+                        <!-- Background track ring -->
+                        <circle class="ring-bg" cx="55" cy="55" r="42" />
+                        <!-- Outer rebalancing arc -->
+                        <circle class="ring-arc-outer" cx="55" cy="55" r="42" stroke="url(#mintArcGrad)" filter="url(#arcGlowFilter)" />
+                        <!-- Inner harmonic ring -->
+                        <circle class="ring-arc-inner" cx="55" cy="55" r="30" stroke="#10B981" opacity="0.4" />
+                      </svg>
+                      <div class="radial-center-badge">
+                        <span class="rebalance-symbol">↻</span>
+                        <span class="rebalance-val">+45m</span>
+                      </div>
+                    </div>
+                    <div class="healing-status-text">
+                      <span class="heal-label">Harmonic Rebalance</span>
+                      <span class="heal-sub">Auto-absorbed into tomorrow</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div><!-- /slab-grid -->
+            </div><!-- /glass-feature-slab -->
+          </div><!-- /slab-harmonic-bobber -->
+        </div><!-- /slab-perspective-viewport -->
+
+      </section>
+
+    </div><!-- /hero-content-grid -->
+
+    <!-- Floating Minimalist Scroll-Down Indicator -->
+    <a href="#archerFocusSection" class="hero-scroll-indicator" id="heroScrollIndicator" aria-label="Scroll to Explore">
+      <span class="scroll-indicator-text">Scroll to Explore</span>
+      <span class="scroll-indicator-chevron" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </span>
+    </a>
+
+  </main>
+
+  <!-- =========================================================================
+       SECTION 2: CINEMATIC FOCUS TRAJECTORY — SCROLL-SCRUBBED STORYTELLING
+       ========================================================================= -->
+  <section class="archer-scroll-section" id="archerFocusSection" aria-label="EKAGRA Focus Trajectory">
+    <div class="archer-sticky-stage" id="archerStickyStage">
+      
+      <!-- Pure White Ambient Edge Vignette Blend Overlays -->
+      <div class="video-blend-overlay overlay-top" aria-hidden="true"></div>
+      <div class="video-blend-overlay overlay-bottom" aria-hidden="true"></div>
+
+      <!-- 60FPS Apple-Style Canvas Sequence (Primary Hardware-Accelerated Renderer) -->
+      <canvas id="focusStoryCanvas" class="focus-story-canvas" aria-label="EKAGRA Focus Trajectory Sequence"></canvas>
+
+    </div><!-- /archer-sticky-stage -->
+  </section>
+
+  <!-- =========================================================================
+       SECTION 3: HOW IT WORKS — Four Simple Steps
+       ========================================================================= -->
+  <section class="content-section how-section" id="how-it-works" aria-label="How EKAGRA works">
+    <div class="section-container">
+      
+      <!-- Section Header -->
+      <div class="section-header-wrap">
+        <div class="section-eyebrow">HOW IT WORKS</div>
+        <h2 class="section-headline">How EKAGRA works.</h2>
+        <p class="section-subheadline">
+          Four simple steps to fit your goals into real life.
+        </p>
+      </div>
+
+      <!-- 4-Stage Horizontal Floating Chain -->
+      <div class="steps-chain-grid">
+        
+        <!-- Step 01 -->
+        <div class="step-card" id="step1">
+          <div class="step-number-tag">01</div>
+          <div class="step-icon-wrap" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </div>
+          <h3 class="step-title">Map your real day</h3>
+          <p class="step-desc">
+            Add your sleep, college, or work hours so we only plan around your free time.
+          </p>
+          <div class="step-meta-chip">
+            <span>Your real schedule</span>
+          </div>
+        </div>
+
+        <!-- Step 02 -->
+        <div class="step-card" id="step2">
+          <div class="step-number-tag">02</div>
+          <div class="step-icon-wrap" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <h3 class="step-title">Put top goals first</h3>
+          <p class="step-desc">
+            Set priorities so urgent and important tasks always get done before the rest.
+          </p>
+          <div class="step-meta-chip">
+            <span>Clear priority order</span>
+          </div>
+        </div>
+
+        <!-- Step 03 -->
+        <div class="step-card" id="step3">
+          <div class="step-number-tag">03</div>
+          <div class="step-icon-wrap" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+            </svg>
+          </div>
+          <h3 class="step-title">Plans change? Move on</h3>
+          <p class="step-desc">
+            Miss a task or run late—one click moves it to your next open slot.
+          </p>
+          <div class="step-meta-chip">
+            <span>No stress rescheduling</span>
+          </div>
+        </div>
+
+        <!-- Step 04 -->
+        <div class="step-card step-interactive" id="step4">
+          <div class="step-number-tag">04</div>
+          <div class="step-icon-wrap" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </div>
+          <h3 class="step-title">Learns your pace</h3>
+          <p class="step-desc">
+            Quick check-ins help EKAGRA learn how fast you work and when you focus best.
+          </p>
+          
+          <!-- Interactive Action Demonstration Buttons -->
+          <div class="step-status-bar">
+            <button type="button" class="status-btn btn-done" id="demoDoneBtn" title="Mark Done">✓ Done</button>
+            <button type="button" class="status-btn btn-missed" id="demoMissBtn" title="Mark Missed">✕ Missed</button>
+            <button type="button" class="status-btn btn-rebalance" id="demoRebalanceBtn" title="Auto Rebalance">↻ Reschedule</button>
+          </div>
+          <span class="step-feedback-indicator" id="demoFeedbackText">Try clicking one</span>
+        </div>
+
+      </div><!-- /steps-chain-grid -->
+
+    </div><!-- /section-container -->
+  </section>
+
+  <!-- =========================================================================
+       SECTION 4: FEATURES — Full-Screen Scroll-Connected Feature Flow
+       ========================================================================= -->
+  <section class="features-scroll-section" id="features" aria-label="EKAGRA Features">
+    <div class="features-sticky-stage" id="featuresStickyStage">
+      
+      <!-- Section Header (Clean plain eyebrow, no glowing box) -->
+      <div class="features-header-wrap">
+        <div class="section-eyebrow">FEATURES</div>
+        <h2 class="section-headline">Everything works together.</h2>
+        <p class="section-subheadline">
+          Watch how one day in EKAGRA connects from start to finish.
+        </p>
+      </div>
+
+      <!-- 5-Node Connected Scroll Flow Stage -->
+      <div class="features-flow-viewport">
+        
+        <!-- SVG Connecting Line between Node 01 -> 02 -> 03 -> 04 -> 05 -->
+        <div class="features-connector-wrap" aria-hidden="true">
+          <svg class="features-connector-svg" viewBox="0 0 1000 24" preserveAspectRatio="none">
+            <line class="connector-track" x1="100" y1="12" x2="900" y2="12" />
+            <path class="connector-path" id="featuresConnectorPath" d="M 100 12 L 900 12" pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000" />
+          </svg>
+        </div>
+
+        <!-- 5 Feature Nodes -->
+        <div class="features-nodes-grid" id="featuresNodesGrid">
+          
+          <!-- Node 01 -->
+          <div class="feature-flow-node is-active" id="featureNode1" data-index="1">
+            <div class="node-bullet-wrap">
+              <span class="node-bullet-num">01</span>
+              <span class="node-pulse-halo"></span>
+            </div>
+            <div class="node-card-body">
+              <div class="node-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </div>
+              <h3 class="node-title">24-Hour Routine Gate</h3>
+              <p class="node-desc">Locks in sleep, classes, and work first so tasks never clash with real life.</p>
+              <div class="node-tag-pill">Protected base</div>
+            </div>
+          </div>
+
+          <!-- Node 02 -->
+          <div class="feature-flow-node" id="featureNode2" data-index="2">
+            <div class="node-bullet-wrap">
+              <span class="node-bullet-num">02</span>
+              <span class="node-pulse-halo"></span>
+            </div>
+            <div class="node-card-body">
+              <div class="node-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <h3 class="node-title">Goal & Daily Tasks</h3>
+              <p class="node-desc">Keep big goals separate from everyday chores, with optional Gemini time estimates.</p>
+              <div class="node-tag-pill">Smart estimates</div>
+            </div>
+          </div>
+
+          <!-- Node 03 -->
+          <div class="feature-flow-node" id="featureNode3" data-index="3">
+            <div class="node-bullet-wrap">
+              <span class="node-bullet-num">03</span>
+              <span class="node-pulse-halo"></span>
+            </div>
+            <div class="node-card-body">
+              <div class="node-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+              </div>
+              <h3 class="node-title">Priority Auto-Scheduler</h3>
+              <p class="node-desc">Places top tasks into your open hours while keeping 15% breathing room.</p>
+              <div class="node-tag-pill">Calm pacing</div>
+            </div>
+          </div>
+
+          <!-- Node 04 -->
+          <div class="feature-flow-node" id="featureNode4" data-index="4">
+            <div class="node-bullet-wrap">
+              <span class="node-bullet-num">04</span>
+              <span class="node-pulse-halo"></span>
+            </div>
+            <div class="node-card-body">
+              <div class="node-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <h3 class="node-title">1-Second Check-In</h3>
+              <p class="node-desc">Tap how long a task really took in one second—no annoying timer to babysit.</p>
+              <div class="node-tag-pill">Zero friction</div>
+            </div>
+          </div>
+
+          <!-- Node 05 -->
+          <div class="feature-flow-node" id="featureNode5" data-index="5">
+            <div class="node-bullet-wrap">
+              <span class="node-bullet-num">05</span>
+              <span class="node-pulse-halo"></span>
+            </div>
+            <div class="node-card-body">
+              <div class="node-icon-box">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 20V10"></path>
+                  <path d="M12 20V4"></path>
+                  <path d="M6 20v-6"></path>
+                </svg>
+              </div>
+              <h3 class="node-title">Real Pace Learning</h3>
+              <p class="node-desc">Learns your real speed and best focus hours from what you actually finish.</p>
+              <div class="node-tag-pill">Personalized loop</div>
+            </div>
+          </div>
+
+        </div><!-- /features-nodes-grid -->
+
+      </div><!-- /features-flow-viewport -->
+
+    </div><!-- /features-sticky-stage -->
+  </section>
+
+  <!-- =========================================================================
+       SECTION 5: ABOUT — Full-Screen Split-Reveal Transition
+       ========================================================================= -->
+  <!-- =========================================================================
+       SECTION 5: ABOUT (Sticky 100vh Stage with Shining Snake-Like SVG Path)
+       ========================================================================= -->
+  <section class="about-section" id="about" aria-label="About EKAGRA">
+    <div class="about-sticky-stage">
+      <!-- Calm animated ambient background layer -->
+      <div class="about-ambient-layer" aria-hidden="true">
+        <div class="about-ambient-sweep"></div>
+        <div class="about-ambient-ring ring-1"></div>
+        <div class="about-ambient-ring ring-2"></div>
+      </div>
+
+      <div class="section-container">
+        
+        <div class="about-split-layout">
+          
+          <!-- Left Column: Anchored Clean Readable Copy -->
+          <div class="about-left-col">
+            <div class="section-eyebrow">ABOUT EKAGRA</div>
+            <h2 class="about-headline">Built because normal to-do lists ignore real life.</h2>
+            <div class="about-prose">
+              <p>
+                Most planners assume your whole day is open and everything goes as planned. Real days have classes, commutes, tired evenings, and unexpected delays.
+              </p>
+              <p>
+                EKAGRA starts with your actual 24 hours, puts your highest-priority goals first, and learns your real pace—so your plan fits your life, not the other way around.
+              </p>
+            </div>
+          </div>
+
+          <!-- Right Column: 3 Cards + Shining Snake-like S-Curve SVG Path -->
+          <div class="about-right-col" id="aboutRightCol">
+            
+            <!-- SVG Snake Canvas Overlay -->
+            <svg class="about-snake-svg" id="aboutSnakeSvg" aria-hidden="true">
+              <defs>
+                <linearGradient id="snakeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#10B981" />
+                  <stop offset="50%" stop-color="#34D399" />
+                  <stop offset="100%" stop-color="#059669" />
+                </linearGradient>
+                <filter id="snakeGlow" x="-30%" y="-30%" width="160%" height="160%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="3.5" flood-color="rgba(16, 185, 129, 0.7)" />
+                </filter>
+              </defs>
+              <!-- 1. Base Track Path -->
+              <path class="snake-track-path" id="snakeTrackPath" d="" />
+              <!-- 2. Shining Active Snake Path -->
+              <path class="snake-active-path" id="snakeActivePath" d="" filter="url(#snakeGlow)" />
+              <!-- 3. Leading Glowing Orb -->
+              <circle class="snake-leading-orb-glow" id="snakeLeadingOrbGlow" cx="-100" cy="-100" r="12" />
+              <circle class="snake-leading-orb" id="snakeLeadingOrb" cx="-100" cy="-100" r="5.5" />
+            </svg>
+
+            <!-- Card 1 -->
+            <div class="about-principle-card card-offset-left" id="aboutCard1" data-index="0">
+              <div class="principle-node-anchor" aria-hidden="true">
+                <span class="node-pulse-ring"></span>
+                <span class="node-core-dot"></span>
+              </div>
+              <div class="principle-accent-bar" aria-hidden="true"></div>
+              <div class="principle-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </div>
+              <div class="principle-content">
+                <h3 class="principle-title">Private & Encrypted</h3>
+                <p class="principle-desc">
+                  Your goals, routines, and personal Gemini API key are encrypted and stay yours.
+                </p>
+              </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="about-principle-card card-offset-right" id="aboutCard2" data-index="1">
+              <div class="principle-node-anchor" aria-hidden="true">
+                <span class="node-pulse-ring"></span>
+                <span class="node-core-dot"></span>
+              </div>
+              <div class="principle-accent-bar" aria-hidden="true"></div>
+              <div class="principle-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 14 14"></polyline>
+                </svg>
+              </div>
+              <div class="principle-content">
+                <h3 class="principle-title">Works Without AI</h3>
+                <p class="principle-desc">
+                  Estimate manually and schedule anytime—AI helps when you want it, never blocks you.
+                </p>
+              </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="about-principle-card card-offset-left" id="aboutCard3" data-index="2">
+              <div class="principle-node-anchor" aria-hidden="true">
+                <span class="node-pulse-ring"></span>
+                <span class="node-core-dot"></span>
+              </div>
+              <div class="principle-accent-bar" aria-hidden="true"></div>
+              <div class="principle-icon-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+              </div>
+              <div class="principle-content">
+                <h3 class="principle-title">Honest Progress Only</h3>
+                <p class="principle-desc">
+                  No fake streaks or made-up scores. Progress only moves when you finish real work.
+                </p>
+              </div>
+            </div>
+
+          </div><!-- /about-right-col -->
+
+        </div><!-- /about-split-layout -->
+
+      </div><!-- /section-container -->
+    </div><!-- /about-sticky-stage -->
+  </section>
+
+  <!-- =========================================================================
+       SECTION 6: FINAL ACTION CALL & MINIMAL FOOTER
+       ========================================================================= -->
+  <section class="content-section cta-section" id="launch">
+    <div class="section-container">
+      
+      <!-- Floating Glass CTA Island -->
+      <div class="cta-island-card">
+        <div class="cta-emerald-glow"></div>
+        <div class="cta-inner-content">
+          <div class="cta-leaf-badge" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="5" r="3.2" fill="#C084FC"/>
+              <path d="M14.5 28C14.5 28 5 23 5 14C5 10 9.5 11.5 14.5 16Z" fill="#06B6D4"/>
+              <path d="M17.5 28C17.5 28 27 23 27 14C27 10 22.5 11.5 17.5 16Z" fill="#8B5CF6"/>
+            </svg>
+          </div>
+
+          <h2 class="cta-headline">One Focus. Many Goals.</h2>
+          <p class="cta-subheadline">
+            Stop rebuilding your day by hand. Start with a plan that adjusts with you.
+          </p>
+
+          <div class="cta-button-row">
+            <a href="/signup" class="btn-cta-launch" id="btnLaunchEkagra">
+              <span>Launch EKAGRA — Free</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </a>
+          </div>
+
+          <!-- Trust Badges (Plain text, no neon glow) -->
+          <div class="cta-trust-strip">
+            <span class="trust-item">Free to use</span>
+            <span class="trust-divider">•</span>
+            <span class="trust-item">Your data stays private</span>
+            <span class="trust-divider">•</span>
+            <span class="trust-item">Ready in under 2 minutes</span>
+          </div>
+        </div>
+      </div><!-- /cta-island-card -->
+
+    </div><!-- /section-container -->
+  </section>
+
+  <!-- MINIMAL UNDERSTATED FOOTER -->
+  <footer class="minimal-footer">
+    <div class="footer-container">
+      
+      <!-- Brand & Emblem -->
+      <div class="footer-brand">
+        <div class="footer-emblem-wrap">
+          <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="5" r="3" fill="#C084FC"/>
+            <path d="M14.5 28C14.5 28 5 23 5 14C5 10 9.5 11.5 14.5 16Z" fill="#06B6D4"/>
+            <path d="M17.5 28C17.5 28 27 23 27 14C27 10 22.5 11.5 17.5 16Z" fill="#8B5CF6"/>
+          </svg>
+        </div>
+        <span class="footer-wordmark">EKAGRA</span>
+      </div>
+
+      <!-- Footer Nav Links (STRICTLY NO PRICING) -->
+      <ul class="footer-links">
+        <li><a href="#how-it-works" class="footer-link">How It Works</a></li>
+        <li><a href="#features" class="footer-link">Features</a></li>
+        <li><a href="#about" class="footer-link">About</a></li>
+      </ul>
+
+      <!-- Right Column: Personal Links & Copyright -->
+      <div class="footer-right">
+        <div class="footer-socials">
+          
+          <!-- LinkedIn -->
+          <a href="https://www.linkedin.com/in/nithish-kumar-chirukuripati-1a0358338?utm_source=share_via&utm_content=profile&utm_medium=member_android" 
+             target="_blank" 
+             rel="noopener noreferrer" 
+             class="social-link" 
+             aria-label="LinkedIn"
+             title="LinkedIn">
+            <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
+              <rect x="2" y="9" width="4" height="12"></rect>
+              <circle cx="4" cy="4" r="2"></circle>
+            </svg>
+            <span class="social-tooltip">LinkedIn</span>
+          </a>
+
+          <!-- GitHub -->
+          <a href="https://github.com/nk21-dev" 
+             target="_blank" 
+             rel="noopener noreferrer" 
+             class="social-link" 
+             aria-label="GitHub"
+             title="GitHub">
+            <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+            </svg>
+            <span class="social-tooltip">GitHub</span>
+          </a>
+
+          <!-- Email / Contact -->
+          <a href="mailto:contact@ekagra.ai" 
+             class="social-link" 
+             aria-label="Email"
+             title="Email">
+            <svg class="social-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            <span class="social-tooltip">Email</span>
+          </a>
+
+        </div>
+
+        <!-- Copyright Notice -->
+        <div class="footer-copyright">
+          <span>© 2026 EKAGRA. Built for focused daily work.</span>
+        </div>
+      </div>
+
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

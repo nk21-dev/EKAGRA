@@ -1,0 +1,29 @@
+{
+  "name": "ekagra",
+  "version": "1.0.0",
+  "description": "EKAGRA — Sovereign Personal Execution Engine",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node tests/auth.test.js && node tests/http.test.js && node tests/goals.test.js && node tests/goals_crud_ux.test.js && node tests/dashboard_lifecycle.test.js && node tests/goal_progress_derived.test.js && node tests/goals_routine_tasks.test.js && node tests/routine_setup_and_12hour_time.test.js && node tests/routine_coverage_and_display.test.js && node tests/ai_duration_estimation.test.js && node tests/core_intelligence_loop.test.js && node tests/ui_scheduling_synchronization.test.js && node tests/task_sync_and_ml_audit.test.js && node tests/independent_tasks.test.js && node --test tests/schedule_collision_and_dedup.test.js"
+  },
+  "keywords": [
+    "ekagra",
+    "focus",
+    "productivity",
+    "authentication"
+  ],
+  "author": "EKAGRA Team",
+  "license": "ISC",
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^10.0.15"
+  }
+}

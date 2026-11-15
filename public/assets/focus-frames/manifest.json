@@ -1,0 +1,10 @@
+{
+  "totalFrames": 140,
+  "framePrefix": "/assets/focus-frames/frame_",
+  "frameExt": ".jpg",
+  "frameDigits": 4,
+  "width": 1280,
+  "height": 720,
+  "firstFrame": "/assets/focus-frames/frame_0001.jpg",
+  "lastFrame": "/assets/focus-frames/frame_0140.jpg"
+}

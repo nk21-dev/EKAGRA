@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — EKAGRA</title>
+  <meta name="description" content="EKAGRA — Sovereign Personal Execution Engine">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='5' r='3' fill='%23C084FC'/%3E%3Cpath d='M14.5 28C14.5 28 5 23 5 14C5 10 9.5 11.5 14.5 16Z' fill='%2306B6D4'/%3E%3Cpath d='M17.5 28C17.5 28 27 23 27 14C27 10 22.5 11.5 17.5 16Z' fill='%238B5CF6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+
+  <!-- ==========================================================================
+       1. Persistent Left Sidebar Navigation
+       ========================================================================== -->
+  <aside class="app-sidebar">
+    <div class="sidebar-top">
+      
+      <!-- Brand Header -->
+      <a href="/" class="sidebar-brand">
+        <svg class="brand-glyph" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sbLeftPetal" x1="4" y1="32" x2="18" y2="12" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#06B6D4" />
+              <stop offset="100%" stop-color="#14B8A6" />
+            </linearGradient>
+            <linearGradient id="sbRightPetal" x1="20" y1="12" x2="34" y2="32" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#8B5CF6" />
+              <stop offset="100%" stop-color="#4F46E5" />
+            </linearGradient>
+            <linearGradient id="sbCrownDot" x1="16" y1="3" x2="22" y2="9" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#E9D5FF" />
+              <stop offset="100%" stop-color="#A855F7" />
+            </linearGradient>
+          </defs>
+          <circle cx="19" cy="20" r="14" fill="#10B981" opacity="0.15" />
+          <circle cx="19" cy="6.5" r="3.2" fill="url(#sbCrownDot)" />
+          <path d="M17.4 31.5C17.4 31.5 6 26.5 6 15.5C6 11 11.5 12.8 17.2 18.2C17.4 22.5 17.4 28.5 17.4 31.5Z" fill="url(#sbLeftPetal)" />
+          <path d="M20.6 31.5C20.6 31.5 32 26.5 32 15.5C32 11 26.5 12.8 20.8 18.2C20.6 22.5 20.6 28.5 20.6 31.5Z" fill="url(#sbRightPetal)" />
+          <path d="M19 12V33" stroke="#FFFFFF" stroke-width="1.2" stroke-linecap="round" opacity="0.9" />
+        </svg>
+        <span class="brand-name">EKAGRA</span>
+      </a>
+
+      <!-- Navigation Links with Active Pill Highlights -->
+      <nav>
+        <ul class="sidebar-nav">
+          <li>
+            <button type="button" class="nav-link-btn active" data-view="home">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              <span>Home</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="nav-link-btn" data-view="goals">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+              <span>Goals</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="nav-link-btn" data-view="tasks">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+              <span>Tasks</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="nav-link-btn" data-view="schedule">
+              <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <span>Schedule</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="nav-link-btn" data-view="routines">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Routines</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="nav-link-btn" data-view="insights">
+              <svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              <span>Insights</span>
+            </button>
+          </li>
+          <li>
+            <button type="button" class="nav-link-btn" data-view="settings">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Settings</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+
+    <!-- Sidebar Botanical Footer Card -->
+    <div class="sidebar-footer-card">
+      <div class="sidebar-footer-text">Small steps create big changes.</div>
+      <svg class="sidebar-footer-leaf" viewBox="0 0 60 60" fill="none">
+        <path d="M10 50 C20 30 40 15 55 10 C50 30 35 48 10 50 Z" fill="#10B981" opacity="0.35"/>
+        <path d="M10 50 C26 36 42 22 55 10" stroke="#10B981" stroke-width="1.2" opacity="0.6"/>
+      </svg>
+    </div>
+  </aside>
+
+  <!-- ==========================================================================
+       2. Main Content & Global Top Bar
+       ========================================================================== -->
+  <div class="app-main">
+    
+    <!-- Global Sticky Top Bar -->
+    <header class="global-topbar">
+      <div class="greeting-block">
+        <h1 class="greeting-title" id="topbarGreetingTitle">Good Morning ☀️</h1>
+        <div class="greeting-sub">
+          <span>Keep going. You're building your future.</span>
+          <span class="date-divider">•</span>
+          <span id="topbarDateText">Tue, 8 Apr 2026</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <!-- Dual Theme Toggle Slider -->
+        <div class="theme-switch-slider" id="themeSwitchSlider" title="Toggle Light / Dark Mode" role="button" tabindex="0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <div class="theme-switch-ball"></div>
+        </div>
+
+        <!-- User Profile Dropdown Badge -->
+        <div class="profile-badge-wrap">
+          <div class="user-profile-btn" id="userProfileDropdownBtn">
+            <span class="avatar-circle" id="topbarAvatarInitial">--</span>
+            <span class="user-name-label" id="topbarUserName">Account</span>
+            <svg class="caret-icon" viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+
+          <!-- Dropdown Menu -->
+          <div class="profile-dropdown-menu" id="profileDropdownMenu">
+            <button type="button" class="dropdown-item" id="menuProfileBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <span>View Profile</span>
+            </button>
+            <button type="button" class="dropdown-item" id="menuSettingsBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Settings</span>
+            </button>
+            <button type="button" class="dropdown-item danger" id="menuSignoutBtn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==========================================================================
+         3. Dynamic Views Viewport
+         ========================================================================== -->
+    <main class="views-viewport">
+
+      <!-- ======================================================================
+           GLOBAL: Persistent 24-Hour Routine Incomplete Warning Banner
+           Displays across Dashboard, Goals, Tasks, and Schedule until 1440m covered
+           ====================================================================== -->
+      <div id="globalRoutineIncompleteBanner" class="global-incomplete-banner" style="display: none;">
+        <div class="banner-content">
+          <span class="banner-icon">⚠️</span>
+          <span id="globalRoutineBannerText" class="banner-text">Without your full 24-hour schedule, EKAGRA cannot know when you are free vs. busy to schedule your goals.</span>
+        </div>
+        <button type="button" id="globalRoutineBannerBtn" class="btn-primary-emerald banner-action-btn" onclick="openInitialRoutineModal(true)">Complete Routine</button>
+      </div>
+
+      <!-- ======================================================================
+           VIEW 1: DASHBOARD HOME (Collage Screen 1 & 11)
+           ====================================================================== -->
+      <section class="dashboard-view active" id="view-home">
+        
+        <!-- Top Row (3 Columns: Today's Progress, Next Task, Today's Schedule) -->
+        <div class="home-grid-top">
+          
+          <!-- Card 1: Today's Progress -->
+          <div class="dash-card">
+            <div class="card-header-row">
+              <div class="card-header-title">Today's Progress</div>
+            </div>
+
+            <div class="progress-meta-row">
+              <span class="progress-task-count" id="homeProgressTaskCount">0 / 0 tasks</span>
+              <span class="progress-pct" id="homeProgressPct">0%</span>
+            </div>
+
+            <div class="meter-track">
+              <div class="meter-fill" id="homeProgressBarFill" style="width: 0%;"></div>
+            </div>
+
+            <div class="progress-pills-row">
+              <div class="stat-subpill">
+                <span class="stat-subpill-label">Completed</span>
+                <span class="stat-subpill-num completed" id="homeStatCompleted">0</span>
+              </div>
+              <div class="stat-subpill">
+                <span class="stat-subpill-label">Missed</span>
+                <span class="stat-subpill-num missed" id="homeStatMissed">0</span>
+              </div>
+              <div class="stat-subpill">
+                <span class="stat-subpill-label">Rescheduled</span>
+                <span class="stat-subpill-num rescheduled" id="homeStatRescheduled">0</span>
+              </div>
+            </div>
+            <div class="progress-guidance-text" id="homeProgressGuidance" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px;"></div>
+          </div>
+
+          <!-- Card 2: Next Task Card -->
+          <div class="dash-card">
+            <div class="card-header-row">
+              <div class="card-header-title">Next Task</div>
+            </div>
+            <div class="next-task-container" id="homeNextTaskContainer">
+              <!-- Rendered dynamically (Next Task or Cold-Start state) -->
+            </div>
+          </div>
+
+          <!-- Card 3: Today's Schedule Timeline -->
+          <div class="dash-card">
+            <div class="card-header-row" style="flex-wrap: nowrap; gap: 8px;">
+              <div class="card-header-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Today's Schedule</div>
+              <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0; white-space: nowrap;">
+                <button type="button" class="btn-secondary-pill" id="homeAutoScheduleBtn" onclick="triggerAutoSchedule()" style="padding: 3px 8px; font-size: 0.72rem; white-space: nowrap; background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald); border-color: rgba(16, 185, 129, 0.3);">⚡ Auto-Schedule Today</button>
+                <a class="card-header-link" onclick="switchView('schedule')" style="white-space: nowrap; flex-shrink: 0;">View all →</a>
+              </div>
+            </div>
+            <div class="timeline-scroll-list" id="homeTimelineList">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Bottom Row (3 Columns: Active Goals, Dynamic Insights, Recent Activity) -->
+        <div class="home-grid-bottom">
+          
+          <!-- Card 4: Active Goals Overview -->
+          <div class="dash-card">
+            <div class="card-header-row">
+              <div class="card-header-title">Goals</div>
+              <a class="card-header-link" onclick="switchView('goals')">View all →</a>
+            </div>
+            <div class="goals-compact-list" id="homeGoalsOverviewList">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Card 5: Dynamic Insights Box -->
+          <div class="dash-card">
+            <div class="card-header-row">
+              <div class="card-header-title">Insights</div>
+              <a class="card-header-link" onclick="switchView('insights')">View all →</a>
+            </div>
+            <div class="insights-feed" id="homeInsightsFeed">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Card 6: Recent Activity Log -->
+          <div class="dash-card">
+            <div class="card-header-row">
+              <div class="card-header-title">Recent Activity</div>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Real-time</span>
+            </div>
+            <div class="activity-feed" id="homeActivityFeed">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           VIEW 2: GOALS HUB (Collage Screen 2 & 12)
+           ====================================================================== -->
+      <section class="dashboard-view" id="view-goals">
+        
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Goals</h2>
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">Set meaningful goals. Track your progress. Achieve more.</p>
+        </div>
+
+        <!-- Filter & Search Controls Bar -->
+        <div class="view-controls-bar">
+          <div class="filter-pills-group">
+            <button type="button" class="filter-pill-btn goals-filter-btn active" data-filter="All" onclick="setGoalFilter('All')">All</button>
+            <button type="button" class="filter-pill-btn goals-filter-btn" data-filter="On Track" onclick="setGoalFilter('On Track')">On Track</button>
+            <button type="button" class="filter-pill-btn goals-filter-btn" data-filter="At Risk" onclick="setGoalFilter('At Risk')">At Risk</button>
+            <button type="button" class="filter-pill-btn goals-filter-btn" data-filter="Behind" onclick="setGoalFilter('Behind')">Behind</button>
+          </div>
+
+          <div style="display: flex; gap: 12px;">
+            <div class="search-input-wrap">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="search" id="goalSearchInput" name="goal_filter_query" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" readonly onfocus="this.removeAttribute('readonly')" class="search-field" placeholder="Search goals..." oninput="handleGoalSearch(event)">
+            </div>
+            <button type="button" class="btn-primary-emerald" onclick="openAddGoalModal()">
+              <span>+ Add Goal</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Small Dismissible First Task Invitation Banner (Matching Step C) -->
+        <div id="firstTaskBanner" class="first-task-banner-box" style="display: none;">
+          <div class="first-task-banner-left">
+            <div class="first-task-banner-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div>
+              <div class="first-task-banner-title">Your goal is ready! 🌱</div>
+              <div class="first-task-banner-subtitle">Break it into your first small task to get started.</div>
+            </div>
+          </div>
+          <div class="first-task-banner-actions">
+            <button type="button" class="btn-primary-emerald" id="btnBannerAddFirstTask" onclick="handleBannerAddFirstTask()">+ Add First Task</button>
+            <button type="button" class="btn-secondary-pill" onclick="dismissFirstTaskBanner()">Maybe Later</button>
+            <button type="button" class="first-task-banner-close" onclick="dismissFirstTaskBanner()" title="Dismiss">✕</button>
+          </div>
+        </div>
+
+        <!-- Goals Cards Grid -->
+        <div class="goals-cards-grid" id="goalsCardsContainer">
+          <!-- Rendered dynamically -->
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           VIEW 4: TASKS HUB (Collage Screen 4)
+           ====================================================================== -->
+      <section class="dashboard-view" id="view-tasks">
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+          <div>
+            <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Tasks</h2>
+            <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">Turn your plans into progress.</p>
+          </div>
+          <button type="button" class="btn-primary-emerald" onclick="openAddTaskModal()">
+            <span>+ Add Task</span>
+          </button>
+        </div>
+
+        <!-- Status Tabs -->
+        <div class="tasks-tabs-row">
+          <button type="button" class="task-tab-btn active" data-tab="All" onclick="setTaskTab('All')">All</button>
+          <button type="button" class="task-tab-btn" data-tab="Today" onclick="setTaskTab('Today')">Today</button>
+          <button type="button" class="task-tab-btn" data-tab="Upcoming" onclick="setTaskTab('Upcoming')">Upcoming</button>
+          <button type="button" class="task-tab-btn" data-tab="Completed" onclick="setTaskTab('Completed')">Completed</button>
+        </div>
+
+        <!-- Task Type Filter Pills -->
+        <div class="tasks-type-pills-row" id="tasksTypePillsRow">
+          <button type="button" class="task-type-pill active" data-type="all" onclick="setTaskTypeFilter('all')">All Types</button>
+          <button type="button" class="task-type-pill" data-type="goal" onclick="setTaskTypeFilter('goal')">🎯 Goal Tasks</button>
+          <button type="button" class="task-type-pill" data-type="independent" onclick="setTaskTypeFilter('independent')">📌 Independent</button>
+        </div>
+
+        <!-- Search Bar -->
+        <div style="margin-bottom: 16px;">
+          <div class="search-input-wrap">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="search" id="taskSearchInput" name="task_filter_query" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" readonly onfocus="this.removeAttribute('readonly')" class="search-field" style="width: 100%; max-width: 320px;" placeholder="Search tasks..." oninput="handleTaskSearch(event)">
+          </div>
+        </div>
+
+        <!-- Tasks Table Card -->
+        <div class="tasks-table-card" id="tasksTableRows">
+          <!-- Rendered dynamically -->
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           VIEW 6: SCHEDULE TIMELINE (Collage Screen 6)
+           ====================================================================== -->
+      <section class="dashboard-view" id="view-schedule">
+        
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Schedule</h2>
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">Plan your day. Stay consistent.</p>
+        </div>
+
+        <!-- Schedule Navigation Controls -->
+        <div class="schedule-header-controls">
+          <div class="schedule-date-navigator">
+            <button type="button" class="btn-arrow-nav" onclick="navigateScheduleDay(-1)">‹</button>
+            <span class="current-date-title" id="scheduleCurrentDateTitle">Tue, 8 Apr 2026</span>
+            <button type="button" class="btn-arrow-nav" onclick="navigateScheduleDay(1)">›</button>
+            <button type="button" class="btn-secondary-pill" onclick="snapScheduleToday()">Today</button>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" class="btn-secondary-pill" id="btnAutoScheduleGoals" onclick="triggerAutoSchedule()" style="background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald); border-color: rgba(16, 185, 129, 0.3);">⚡ Auto-Schedule Goals</button>
+            <div class="view-mode-toggle">
+              <button type="button" class="view-mode-btn schedule-mode-btn active" data-mode="Day" onclick="setScheduleViewMode('Day')">Day</button>
+              <button type="button" class="view-mode-btn schedule-mode-btn" data-mode="Week" onclick="setScheduleViewMode('Week')">Week</button>
+              <button type="button" class="view-mode-btn schedule-mode-btn" data-mode="Month" onclick="setScheduleViewMode('Month')">Month</button>
+            </div>
+            <button type="button" class="btn-primary-emerald" onclick="openAddTaskModal()">+ Add Task</button>
+          </div>
+        </div>
+
+        <!-- 24h Visual Stream Card -->
+        <div class="schedule-stream-card" id="scheduleStreamContainer">
+          <!-- Rendered dynamically -->
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           VIEW 7: ROUTINES BUILDER (Separate Routine Management Page)
+           ====================================================================== -->
+      <section class="dashboard-view" id="view-routines">
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
+          <div>
+            <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Your Routine</h2>
+            <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">Tell EKAGRA how your day usually works.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" class="btn-secondary-pill" onclick="openCustomizeDaysModal()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              <span>Assign Days</span>
+            </button>
+            <button type="button" class="btn-primary-emerald" onclick="openAddRoutineModal()">
+              <span>+ Add Routine</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Schedule Group Switcher Tabs (Matching Screen 3) -->
+        <div class="routines-group-tabs-row">
+          <button type="button" class="routine-group-tab-btn active" id="btnGroupWeekdays" onclick="switchRoutineActiveGroup('weekdays')">
+            <div class="routine-group-tab-title">Weekdays</div>
+            <div class="routine-group-tab-subtitle" id="tabWeekdaysSubtitle">Mon – Fri</div>
+          </button>
+          <button type="button" class="routine-group-tab-btn" id="btnGroupWeekends" onclick="switchRoutineActiveGroup('weekends')">
+            <div class="routine-group-tab-title">Weekends</div>
+            <div class="routine-group-tab-subtitle" id="tabWeekendsSubtitle">Sat – Sun</div>
+          </button>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 10px; margin-bottom: 6px;">
+          <button type="button" class="btn-secondary-pill" id="btnCopyWeekdaysToWeekends" onclick="copyWeekdaysToWeekends()" style="font-size: 0.78rem; padding: 6px 12px; background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); border-color: rgba(139, 92, 246, 0.3);">📋 Copy Weekdays Routine to Weekends</button>
+        </div>
+
+        <!-- Routines List Container -->
+        <div class="routines-list-container" id="routinesListContainer">
+          <!-- Rendered dynamically -->
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           VIEW 8: INSIGHTS & ANALYTICS (Collage Screen 8)
+           ====================================================================== -->
+      <section class="dashboard-view" id="view-insights">
+        
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Insights</h2>
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">Your progress. In numbers.</p>
+        </div>
+
+        <!-- KPI Summary Row -->
+        <div class="insights-kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-title">Tasks Completed</span>
+              <span class="kpi-chip" id="insightsCompletedChip" style="background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald);">Real-time</span>
+            </div>
+            <div class="kpi-num-lg" id="insightsKpiCompleted">0</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-title">Focus Time</span>
+              <span class="kpi-chip" id="insightsHoursChip" style="background: rgba(6, 182, 212, 0.12); color: #06B6D4;">This Week</span>
+            </div>
+            <div class="kpi-num-lg" id="insightsKpiHours">0 hrs</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-title">Active Streak</span>
+              <span class="kpi-chip" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B;">🔥 Active</span>
+            </div>
+            <div class="kpi-num-lg" id="insightsKpiStreak">0 days</div>
+          </div>
+        </div>
+
+        <!-- Interactive Charts Grid (Productivity Bezier Area Curve & Task Breakdown Ring) -->
+        <div class="charts-grid-row">
+          
+          <!-- Chart 1: Productivity Trend Bezier Curve -->
+          <div class="chart-card">
+            <div class="card-header-title" style="margin-bottom: 14px;">Productivity Trend</div>
+            <div class="chart-svg-container" id="productivityChartContainer">
+              <!-- Rendered via SVG -->
+            </div>
+          </div>
+
+          <!-- Chart 2: Task Breakdown Ring Chart -->
+          <div class="chart-card">
+            <div class="card-header-title" style="margin-bottom: 14px;">Task Breakdown</div>
+            <div class="ring-chart-wrap">
+              <div id="taskBreakdownDonutContainer"></div>
+              <div class="ring-legend-list">
+                <div class="ring-legend-item"><span class="legend-color-dot" style="background: #10B981;"></span><span>Completed</span></div>
+                <div class="ring-legend-item"><span class="legend-color-dot" style="background: #06B6D4;"></span><span>Scheduled</span></div>
+                <div class="ring-legend-item"><span class="legend-color-dot" style="background: #F59E0B;"></span><span>Missed</span></div>
+                <div class="ring-legend-item"><span class="legend-color-dot" style="background: #8B5CF6;"></span><span>Unscheduled</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Top Insights & Learning Feed -->
+        <div class="dash-card">
+          <div class="card-header-title" style="margin-bottom: 18px;">Top Insights</div>
+          <div class="insights-feed" id="insightsHubFeed">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           VIEW 9: SETTINGS (Collage Screen 9)
+           ====================================================================== -->
+      <section class="dashboard-view" id="view-settings">
+        
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Settings</h2>
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">Manage your preferences and account.</p>
+        </div>
+
+        <div class="settings-split-grid">
+          
+          <!-- Left Column: Appearance & Notifications -->
+          <div class="settings-card">
+            <div class="settings-section-title">Appearance</div>
+            <div class="theme-options-row">
+              <div class="theme-choice-box active" data-theme-choice="light" onclick="setTheme('light'); localStorage.setItem('ekagra_theme', 'light');">
+                ☀️ Light
+              </div>
+              <div class="theme-choice-box" data-theme-choice="dark" onclick="setTheme('dark'); localStorage.setItem('ekagra_theme', 'dark');">
+                🌙 Dark
+              </div>
+            </div>
+
+            <div class="settings-section-title" id="settingsNotificationsTitle" style="margin-top: 14px;">Notifications</div>
+            <div class="toggle-switch-row">
+              <span class="toggle-label">Task reminders</span>
+              <label class="toggle-switch-input">
+                <input type="checkbox" id="settingNotifyTasks" onchange="handleNotificationSettingChange('notify_tasks', this.checked)" checked>
+                <span class="toggle-slider-round"></span>
+              </label>
+            </div>
+            <div class="toggle-switch-row">
+              <span class="toggle-label">Goal updates</span>
+              <label class="toggle-switch-input">
+                <input type="checkbox" id="settingNotifyGoals" onchange="handleNotificationSettingChange('notify_goals', this.checked)" checked>
+                <span class="toggle-slider-round"></span>
+              </label>
+            </div>
+            <div class="toggle-switch-row">
+              <span class="toggle-label">Weekly summary</span>
+              <label class="toggle-switch-input">
+                <input type="checkbox" id="settingNotifyWeekly" onchange="handleNotificationSettingChange('notify_weekly', this.checked)" checked>
+                <span class="toggle-slider-round"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Right Column: Account & Data State Controls -->
+          <div class="settings-card">
+            <div class="settings-section-title">Account & Security</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button type="button" class="btn-secondary-pill" style="justify-content: flex-start; padding: 12px 16px;" onclick="switchView('profile')">
+                👤 Profile Details
+              </button>
+              <button type="button" class="btn-secondary-pill" id="btnSettingsChangePassword" style="justify-content: flex-start; padding: 12px 16px;" onclick="handleSettingsChangePassword()">
+                🔒 Change Password
+              </button>
+              <button type="button" class="btn-secondary-pill" id="btnSettingsEmailNotifications" style="justify-content: flex-start; padding: 12px 16px;" onclick="handleEmailNotificationsClick()">
+                ✉️ Email Notifications
+              </button>
+            </div>
+          </div>
+
+          <!-- Row 2 / AI Settings Section -->
+          <div class="settings-card settings-card-wide" id="aiSettingsCard" style="grid-column: 1 / -1; margin-top: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <div class="settings-section-title" style="margin-bottom: 2px;">✨ AI Settings</div>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">Configure your Gemini API key for smart inline task duration estimation.</p>
+              </div>
+              <div id="aiSettingsStatusBadge" class="ai-status-badge ai-status-pending">
+                Checking status...
+              </div>
+            </div>
+
+            <!-- Provider, Status, and Masked Key Overview -->
+            <div class="ai-settings-details-grid">
+              <div class="ai-settings-detail-row">
+                <span class="ai-detail-label">Provider</span>
+                <span class="ai-detail-val" id="aiSettingsProviderVal">
+                  <span style="color: var(--brand-emerald); font-size: 1.05rem;">✦</span> Gemini
+                </span>
+              </div>
+              <div class="ai-settings-detail-row">
+                <span class="ai-detail-label">API Key Status</span>
+                <span class="ai-detail-val">
+                  <span class="ai-key-status-pill" id="aiKeyStatusPill">Not configured</span>
+                </span>
+              </div>
+              <div class="ai-settings-detail-row">
+                <span class="ai-detail-label">Masked Saved Key</span>
+                <span class="ai-detail-val font-mono" id="aiSettingsSavedKeyVal">None configured</span>
+              </div>
+            </div>
+
+            <!-- AI Settings Action Buttons -->
+            <div class="ai-key-actions-row" style="margin-top: 14px;">
+              <button type="button" class="btn-primary-emerald" id="openAiKeyModalBtn" onclick="openGeminiKeyModal()">
+                Add API Key
+              </button>
+              <button type="button" class="btn-secondary-pill" id="testAiConnectionBtn" onclick="testAiProviderConnection()">
+                ⚡ Test Connection
+              </button>
+              <button type="button" class="btn-destructive-ekagra" id="removeAiKeyBtn" onclick="removePersonalApiKeyFromSettings()" style="display: none; padding: 10px 16px; border-radius: 10px; font-size: 0.85rem;">
+                Remove API Key
+              </button>
+            </div>
+
+            <div id="aiSettingsFeedbackMsg" class="inline-ai-notice" style="display: none; margin-top: 12px;"></div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ======================================================================
+           VIEW 10: PROFILE HUB (Collage Screen 10)
+           ====================================================================== -->
+      <section class="dashboard-view" id="view-profile">
+        
+        <div>
+          <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">Profile</h2>
+          <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">Your identity. Your journey.</p>
+        </div>
+
+        <div class="profile-hub-card">
+          <div class="avatar-large" id="profileHubAvatar">--</div>
+          <div class="profile-meta-info">
+            <div class="profile-name-lg" id="profileHubName">--</div>
+            <div class="profile-email-text" id="profileHubEmail">--</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Member since <span id="profileHubJoined">--</span></div>
+          </div>
+        </div>
+
+        <!-- Lifetime Stats Grid -->
+        <div class="lifetime-stats-grid">
+          <div class="dash-card">
+            <span class="stat-subpill-label">Total Goals</span>
+            <div class="kpi-num-lg" id="profileStatGoals">0</div>
+          </div>
+          <div class="dash-card">
+            <span class="stat-subpill-label">Tasks Finished</span>
+            <div class="kpi-num-lg" id="profileStatTasks">0</div>
+          </div>
+          <div class="dash-card">
+            <span class="stat-subpill-label">Longest Streak</span>
+            <div class="kpi-num-lg" id="profileStatStreak">0 days</div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Single-Step Goal Creation (Screen 1)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="addGoalModal">
+    <div class="modal-frosted-card">
+      <button type="button" class="modal-close-btn" onclick="closeModal('addGoalModal')">✕</button>
+      <h3 class="modal-title-lg" style="margin-bottom: 4px;">Create New Goal</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 18px;">Set a meaningful goal to anchor your focused execution.</p>
+
+      <form id="addGoalForm" class="modal-form-stack">
+        <div class="modal-field-group">
+          <label class="modal-label">Goal Name *</label>
+          <input type="text" id="newGoalTitle" class="modal-input" placeholder="e.g. Prepare for AI/ML Internship" required>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Description</label>
+          <textarea id="newGoalDesc" class="modal-textarea" rows="2" placeholder="What specific outcome are you working towards?"></textarea>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Priority</label>
+          <div class="priority-selector-row">
+            <button type="button" class="priority-btn goal-priority-btn" data-prio="Low">Low</button>
+            <button type="button" class="priority-btn goal-priority-btn selected" data-prio="Medium">Medium</button>
+            <button type="button" class="priority-btn goal-priority-btn" data-prio="High">High</button>
+          </div>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Target Date *</label>
+          <input type="date" id="newGoalDate" class="modal-input" required>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="submit" id="addGoalSubmitBtn" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;">Create Goal</button>
+          <button type="button" class="btn-secondary-pill" style="border-radius: 12px;" onclick="closeModal('addGoalModal')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: One-Time Routine Setup Popup (Screen 2)
+       Appears only after first goal creation if not already completed/skipped
+       ========================================================================== -->
+  <!-- ==========================================================================
+       MODAL: One-Time Routine Setup Popup (Step B)
+       Appears only after first goal creation if not already completed/skipped
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="initialRoutineModal">
+    <div class="modal-frosted-card" id="initialRoutineModalCard" style="max-height: 85vh; display: flex; flex-direction: column;">
+      <div class="modal-header-sticky">
+        <button type="button" class="modal-close-btn" onclick="skipInitialRoutineSetup()">✕</button>
+        <div style="text-align: left;">
+          <h3 class="modal-title-lg" id="initialSetupModalTitle" style="margin-bottom: 4px;">Set Up Your Daily Routine</h3>
+          <p id="initialSetupModalSubtitle" style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.45;">
+            Tell EKAGRA when you're busy so we can understand when you are available for your tasks. Without your full 24-hour schedule, EKAGRA cannot know when you are free vs. busy to schedule your goals.
+          </p>
+        </div>
+
+        <!-- Routine Group Switcher Tabs & Live 24h Coverage Meter -->
+        <div class="modal-routine-tabs-row" style="display: flex; gap: 10px; margin-top: 14px;">
+          <button type="button" class="routine-group-tab-btn active" id="modalTabWeekdays" style="flex: 1; padding: 8px 12px;" onclick="switchModalRoutineGroup('weekdays')">
+            <div style="font-weight: 700; font-size: 0.88rem;">Weekdays</div>
+            <div style="font-size: 0.74rem; color: var(--text-secondary);" id="modalCovPillWeekdays">0h / 24h</div>
+          </button>
+          <button type="button" class="routine-group-tab-btn" id="modalTabWeekends" style="flex: 1; padding: 8px 12px;" onclick="switchModalRoutineGroup('weekends')">
+            <div style="font-weight: 700; font-size: 0.88rem;">Weekends</div>
+            <div style="font-size: 0.74rem; color: var(--text-secondary);" id="modalCovPillWeekends">0h / 24h</div>
+          </button>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <div class="meter-track" style="height: 6px; margin-bottom: 6px;">
+            <div class="meter-fill" id="modalCoverageMeterFill" style="width: 0%;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--text-muted);">
+            <span id="modalCoverageLabel">0h 00m / 24h covered</span>
+            <span id="modalCoverageRemaining">24h 00m unallocated</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="routine-modal-scroll-body" id="initialSetupModalScrollBody" style="overflow-y: auto; flex: 1; padding-top: 8px;">
+        <!-- Validation Error Box -->
+        <div id="initialSetupErrorAlert" class="conflict-alert-box" style="display: none; margin-bottom: 12px;">
+          <span>⚠️</span>
+          <div id="initialSetupErrorMsg">Every day must belong to exactly one group.</div>
+        </div>
+
+        <!-- STEP 1 CONTAINER: Groups & Commitments -->
+        <div id="initialSetupStep1">
+          <!-- Weekends Helper Callout (Shown when Weekends tab is active) -->
+          <div id="modalWeekendsCopyBox" style="display: none; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; justify-content: space-between; align-items: center; gap: 10px;">
+            <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4;">
+              <strong style="color: var(--accent-purple);">Weekends Routine:</strong> Duplicate your weekday schedule with 1 click, or add weekend commitments.
+            </div>
+            <button type="button" class="btn-secondary-pill" onclick="copyWeekdaysToWeekendsInModal()" style="font-size: 0.74rem; padding: 5px 12px; background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); border-color: rgba(139, 92, 246, 0.3); white-space: nowrap;">📋 Copy Weekdays</button>
+          </div>
+
+          <!-- Schedule Groups Day Selection -->
+          <div style="background: var(--surface-subtle); border: 1px solid var(--card-border); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">1. Schedule Days Assignment</span>
+              <span style="font-size: 0.74rem; color: var(--text-secondary);">Assign all 7 days</span>
+            </div>
+
+            <div class="initial-day-grid-controls" id="initialDaysSelectorContainer" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Dynamically rendered day assignment rows -->
+            </div>
+
+            <div style="display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--card-border); font-size: 0.76rem;">
+              <div><strong style="color: var(--brand-emerald);">Weekdays:</strong> <span id="initialWeekdaysSummaryText">Mon – Fri</span></div>
+              <div><strong style="color: var(--accent-purple);">Weekends:</strong> <span id="initialWeekendsSummaryText">Sat – Sun</span></div>
+            </div>
+          </div>
+
+          <!-- Routine Blocks Section -->
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">2. Typical Commitments (<span id="initialSetupGroupLabel">Weekdays</span>)</span>
+              <span style="font-size: 0.74rem; color: var(--text-secondary);">Sleep, College, Travel, Gym</span>
+            </div>
+
+            <!-- Quick Add Preset Suggestions (12-Hour AM/PM Format) -->
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;" id="initialPresetChipsContainer">
+              <button type="button" class="btn-preset-chip" onclick="addInitialPresetBlock('Sleep', '11:00 PM', '07:00 AM', null, 'Fixed')">🌙 + Sleep (11:00 PM – 07:00 AM)</button>
+              <button type="button" class="btn-preset-chip" onclick="addInitialPresetBlock('College', '08:00 AM', '03:00 PM', null, 'Fixed')">🏛️ + College (08:00 AM – 03:00 PM)</button>
+              <button type="button" class="btn-preset-chip" onclick="addInitialPresetBlock('Travel', '04:00 PM', '05:00 PM', null, 'Fixed')">🚗 + Travel (04:00 PM – 05:00 PM)</button>
+              <button type="button" class="btn-preset-chip" onclick="addInitialPresetBlock('Gym', '06:00 PM', '07:00 PM', null, 'Flexible')">🏋️ + Gym (06:00 PM – 07:00 PM)</button>
+            </div>
+
+            <!-- Custom Routine Block Creator Form (Inline 12-Hour AM/PM, Non-form container, Antifill protected) -->
+            <div class="modal-form-stack" style="background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;">
+              <div style="margin-bottom: 8px;">
+                <input type="text" id="initialInputName" name="routineBlockLabel" autocomplete="off" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" class="modal-input" placeholder="Routine Name (e.g. College, Sleep, Gym)" style="font-size: 0.82rem; padding: 6px 10px; width: 100%;">
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px;">
+                <div style="display: flex; gap: 4px; align-items: center;">
+                  <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">Start:</span>
+                  <div class="time-12h-picker-box">
+                    <select class="time-12h-select" id="initialStartHour" aria-label="Start Hour">
+                      <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08" selected>08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                    </select>
+                    <span class="time-12h-colon">:</span>
+                    <select class="time-12h-select" id="initialStartMinute" aria-label="Start Minute">
+                      <option value="00" selected>00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+                    </select>
+                    <select class="time-12h-select time-12h-ampm" id="initialStartAmpm" aria-label="Start AM/PM">
+                      <option value="AM" selected>AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 4px; align-items: center;">
+                  <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 600;">End:</span>
+                  <div class="time-12h-picker-box">
+                    <select class="time-12h-select" id="initialEndHour" aria-label="End Hour">
+                      <option value="01">01</option><option value="02">02</option><option value="03" selected>03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+                    </select>
+                    <span class="time-12h-colon">:</span>
+                    <select class="time-12h-select" id="initialEndMinute" aria-label="End Minute">
+                      <option value="00" selected>00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+                    </select>
+                    <select class="time-12h-select time-12h-ampm" id="initialEndAmpm" aria-label="End AM/PM">
+                      <option value="AM">AM</option>
+                      <option value="PM" selected>PM</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <select id="initialInputGroup" class="modal-select" style="font-size: 0.78rem; padding: 4px 8px;">
+                    <option value="weekdays">Weekdays</option>
+                    <option value="weekends">Weekends</option>
+                  </select>
+                  <select id="initialInputType" class="modal-select" style="font-size: 0.78rem; padding: 4px 8px;">
+                    <option value="Fixed">Fixed</option>
+                    <option value="Flexible">Flexible</option>
+                  </select>
+                </div>
+                <button type="button" class="btn-secondary-pill" style="font-size: 0.78rem; padding: 4px 12px;" onclick="addInitialCustomBlock()">+ Add Block</button>
+              </div>
+            </div>
+
+            <!-- Added Blocks List -->
+            <div id="initialRoutineBlocksList" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 CONTAINER: Uncovered Intervals Classification Follow-Up -->
+        <div id="initialSetupStep2" style="display: none;">
+          <div style="background: var(--surface-subtle); border: 1px solid var(--card-border); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">Uncovered Time Intervals</div>
+            <div style="font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4;">
+              We don't assume gaps are free time. Tell EKAGRA what typically happens so task scheduling protects your real availability.
+            </div>
+          </div>
+
+          <div id="initialSetupGapsList" style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Dynamically populated uncovered gaps -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer (Always anchored and accessible) -->
+      <div class="modal-footer-sticky" id="initialSetupModalFooter">
+        <!-- Footer for Step 1 -->
+        <div class="modal-actions-row" id="initialSetupFooterStep1">
+          <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="skipInitialRoutineSetup()">Skip for Now</button>
+          <button type="button" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="saveInitialRoutineSetup()">Save Routine</button>
+        </div>
+
+        <!-- Footer for Step 2 -->
+        <div class="modal-actions-row" id="initialSetupFooterStep2" style="display: none;">
+          <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="saveInitialRoutineProgress()">Save Progress & Finish Later</button>
+          <button type="button" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="finishInitialRoutineSetup()">Save & Complete Routine</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Customize Schedule Days (Weekdays vs Weekends Assignment)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="customizeDaysModal">
+    <div class="modal-frosted-card" style="max-width: 520px;">
+      <button type="button" class="modal-close-btn" onclick="closeModal('customizeDaysModal')">✕</button>
+      <h3 class="modal-title-lg" style="margin-bottom: 4px;">Customize Schedule Days</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+        Assign each day of the week to your Weekdays or Weekends schedule. Every day belongs to exactly one group.
+      </p>
+
+      <div class="days-assignment-list" id="daysAssignmentRowsContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
+        <!-- Rendered dynamically for Mon - Sun -->
+      </div>
+
+      <!-- Preview summary -->
+      <div style="background: var(--surface-subtle); border: 1px solid var(--card-border); border-radius: 10px; padding: 12px; margin-bottom: 18px; font-size: 0.82rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <span style="color: var(--text-muted); font-weight: 600;">Weekdays:</span>
+          <span style="color: var(--brand-emerald); font-weight: 700;" id="daysAssignmentWeekdaysSummary">Mon, Tue, Wed, Thu, Fri</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--text-muted); font-weight: 600;">Weekends:</span>
+          <span style="color: var(--accent-purple); font-weight: 700;" id="daysAssignmentWeekendsSummary">Sat, Sun</span>
+        </div>
+      </div>
+
+      <div class="modal-actions-row">
+        <button type="button" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="saveDayAssignmentsSubmit()">Save Day Assignments</button>
+        <button type="button" class="btn-secondary-pill" style="border-radius: 12px;" onclick="closeModal('customizeDaysModal')">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Edit Goal (No Category)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="editGoalModal">
+    <div class="modal-frosted-card">
+      <button type="button" class="modal-close-btn" onclick="closeModal('editGoalModal')">✕</button>
+      <h3 class="modal-title-lg">Edit Goal</h3>
+
+      <form id="editGoalForm" class="modal-form-stack">
+        <input type="hidden" id="editGoalId">
+        <div class="modal-field-group">
+          <label class="modal-label">Goal Name *</label>
+          <input type="text" id="editGoalTitle" class="modal-input" placeholder="e.g. Prepare for my internship" required>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Description</label>
+          <textarea id="editGoalDesc" class="modal-textarea" rows="2" placeholder="What do you want to achieve?"></textarea>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Priority</label>
+          <div class="priority-selector-row">
+            <button type="button" class="priority-btn edit-goal-priority-btn" data-prio="Low">Low</button>
+            <button type="button" class="priority-btn edit-goal-priority-btn" data-prio="Medium">Medium</button>
+            <button type="button" class="priority-btn edit-goal-priority-btn" data-prio="High">High</button>
+          </div>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Target Date *</label>
+          <input type="date" id="editGoalDate" class="modal-input" required>
+        </div>
+
+        <div class="modal-field-group">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+            <label class="modal-label" style="margin-bottom: 0;">Progress</label>
+            <span style="font-size: 0.88rem; font-weight: 700; color: var(--brand-emerald);" id="editGoalProgressVal">0% — No tasks yet</span>
+          </div>
+          <div class="meter-track" style="height: 6px; margin: 6px 0 4px;">
+            <div class="meter-fill" id="editGoalProgressBarFill" style="width: 0%;"></div>
+          </div>
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px;" id="editGoalProgressSub">Progress is calculated from completed tasks.</div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="submit" id="editGoalSubmitBtn" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;">Save Changes</button>
+          <button type="button" class="btn-secondary-pill" style="border-radius: 12px;" onclick="closeModal('editGoalModal')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Delete Goal Confirmation (EKAGRA Styled)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="deleteGoalModal">
+    <div class="modal-frosted-card modal-delete-card">
+      <button type="button" class="modal-close-btn" onclick="closeModal('deleteGoalModal')">✕</button>
+      <div class="delete-modal-icon-wrap">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          <line x1="10" y1="11" x2="10" y2="17"></line>
+          <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>
+      </div>
+      <h3 class="modal-title-lg" style="margin-bottom: 6px;">Delete this goal?</h3>
+      <div class="delete-goal-target-title" id="deleteGoalTargetTitle">"Goal Name"</div>
+      <p class="delete-modal-warning">This action cannot be undone.</p>
+      
+      <div class="modal-actions-row" style="margin-top: 24px;">
+        <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="closeModal('deleteGoalModal')" id="cancelDeleteGoalBtn">Cancel</button>
+        <button type="button" class="btn-destructive-ekagra" style="flex: 1; border-radius: 12px; padding: 12px;" id="confirmDeleteGoalBtn">Delete Goal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EKAGRA Floating Toast Notification -->
+  <div id="ekagraToastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- ==========================================================================
+       MODAL: Add New Task (Collage Screen 5)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="addTaskModal">
+    <div class="modal-frosted-card">
+      <button type="button" class="modal-close-btn" onclick="closeModal('addTaskModal')">✕</button>
+      <h3 class="modal-title-lg">Add New Task</h3>
+
+      <form id="addTaskForm" class="modal-form-stack" onsubmit="handleAddTaskFormSubmit(event)">
+        <div class="modal-field-group">
+          <label class="modal-label">Task Title *</label>
+          <input type="text" id="newTaskTitle" class="modal-input" placeholder="e.g. Complete DSA Practice" required>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Task Type / Link to Goal</label>
+          <select id="newTaskGoalId" class="modal-select">
+            <option value="">📌 Independent Task (No Goal)</option>
+          </select>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Description (optional)</label>
+          <textarea id="newTaskDesc" class="modal-textarea" rows="2" placeholder="Details or notes about this task"></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="modal-field-group">
+            <label class="modal-label">Priority</label>
+            <select id="newTaskPriority" class="modal-select">
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+
+          <div class="modal-field-group">
+            <label class="modal-label">Due Date (optional)</label>
+            <input type="date" id="newTaskDueDate" class="modal-input">
+          </div>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Estimated Duration (minutes) *</label>
+          <div class="inline-duration-group">
+            <input type="number" id="newTaskDuration" min="1" max="1440" class="modal-input" placeholder="Minutes (e.g. 30)" value="30" required>
+            <button type="button" class="btn-ai-estimate-pill" onclick="handleAiEstimateClick(this, '#newTaskAiNotice', '#newTaskDuration')">⚡ AI Estimate</button>
+          </div>
+          <div id="newTaskAiNotice" class="inline-ai-notice" style="display: none;"></div>
+          <div id="newTaskAiClarification" class="inline-ai-clarification-box" style="display: none;"></div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="submit" id="newTaskSubmitBtn" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;">Create Task</button>
+          <button type="button" class="btn-secondary-pill" style="border-radius: 12px;" onclick="closeModal('addTaskModal')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Add / Edit Routine Block
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="addRoutineModal">
+    <div class="modal-frosted-card" style="max-width: 520px;">
+      <button type="button" class="modal-close-btn" onclick="closeModal('addRoutineModal')">✕</button>
+      <h3 class="modal-title-lg" id="routineModalTitle">Add Routine Block</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+        Record your daily commitments (Sleep, College, Commute, Workout) to protect your focused hours.
+      </p>
+
+      <!-- Overlap / Conflict Alert -->
+      <div id="routineConflictAlert" class="conflict-alert-box" style="display: none;">
+        <span>⚠️</span>
+        <div id="routineConflictMsg">Routine block overlaps with an existing block on the same day.</div>
+      </div>
+
+      <div id="routineForm" class="modal-form-stack">
+        <input type="hidden" id="routineModalEditId">
+
+        <div class="modal-field-group">
+          <label class="modal-label">Routine Name *</label>
+          <input type="text" id="routineInputName" name="routineBlockLabel" autocomplete="off" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" class="modal-input" placeholder="e.g. College / Sleep / Gym" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="modal-field-group">
+            <label class="modal-label">Start Time *</label>
+            <div class="time-12h-picker-box" id="routineStartTimeBox" style="width: 100%; justify-content: space-between;">
+              <select class="time-12h-select" id="routineStartHour" onchange="updateRoutineOvernightIndicator()">
+                <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08" selected>08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+              </select>
+              <span class="time-12h-colon">:</span>
+              <select class="time-12h-select" id="routineStartMinute" onchange="updateRoutineOvernightIndicator()">
+                <option value="00" selected>00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+              </select>
+              <select class="time-12h-select time-12h-ampm" id="routineStartAmpm" onchange="updateRoutineOvernightIndicator()">
+                <option value="AM" selected>AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-field-group">
+            <label class="modal-label">End Time *</label>
+            <div class="time-12h-picker-box" id="routineEndTimeBox" style="width: 100%; justify-content: space-between;">
+              <select class="time-12h-select" id="routineEndHour" onchange="updateRoutineOvernightIndicator()">
+                <option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04" selected>04</option><option value="05">05</option><option value="06">06</option><option value="07">07</option><option value="08">08</option><option value="09">09</option><option value="10">10</option><option value="11">11</option><option value="12">12</option>
+              </select>
+              <span class="time-12h-colon">:</span>
+              <select class="time-12h-select" id="routineEndMinute" onchange="updateRoutineOvernightIndicator()">
+                <option value="00" selected>00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+              </select>
+              <select class="time-12h-select time-12h-ampm" id="routineEndAmpm" onchange="updateRoutineOvernightIndicator()">
+                <option value="AM">AM</option>
+                <option value="PM" selected>PM</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overnight Indicator Note -->
+        <div id="routineOvernightHint" style="display: none; font-size: 0.78rem; color: var(--accent-purple); background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 8px; padding: 6px 12px; margin-top: -6px;">
+          🌙 Overnight block: spans across midnight into the next morning (e.g. 11:00 PM to 06:30 AM).
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Schedule Group</label>
+          <div class="priority-selector-row" id="routineGroupSelector">
+            <button type="button" class="priority-btn routine-group-select-btn selected" data-group="weekdays" onclick="setRoutineFormGroup('weekdays')">Weekdays</button>
+            <button type="button" class="priority-btn routine-group-select-btn" data-group="weekends" onclick="setRoutineFormGroup('weekends')">Weekends</button>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;" id="routineGroupAssignedHint">Applies to your assigned Weekday schedule.</div>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Commitment Type</label>
+          <div class="priority-selector-row" id="routineTypePills">
+            <button type="button" class="priority-btn routine-type-btn selected" data-type="Fixed">Fixed</button>
+            <button type="button" class="priority-btn routine-type-btn" data-type="Flexible">Flexible</button>
+          </div>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Classification (Optional)</label>
+          <select id="routineInputClassification" class="modal-select" style="width: 100%;">
+            <option value="">Standard Routine</option>
+            <option value="Sleep / Rest">🌙 Sleep / Rest</option>
+            <option value="Meals">🍽️ Meals</option>
+            <option value="Travel">🚗 Travel</option>
+            <option value="College / Work">🏛️ College / Work</option>
+            <option value="Exercise">🏃 Exercise</option>
+            <option value="Personal / Family Time">👥 Personal / Family Time</option>
+            <option value="Flexible Time">⏳ Flexible Time</option>
+            <option value="Usually Available">✨ Usually Available</option>
+          </select>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" id="routineSubmitBtn" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="handleRoutineFormSubmit(event)">Save Routine</button>
+          <button type="button" class="btn-secondary-pill" style="border-radius: 12px;" onclick="closeModal('addRoutineModal')">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Classify Uncovered Gap
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="classifyGapModal">
+    <div class="modal-frosted-card" style="max-width: 520px;">
+      <button type="button" class="modal-close-btn" onclick="closeModal('classifyGapModal')">✕</button>
+      <h3 class="modal-title-lg" style="margin-bottom: 4px;">Classify Schedule Gap</h3>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+        Tell EKAGRA what typically happens during <strong id="classifyGapTimeDisplay" style="color: var(--text-primary);"></strong>.
+      </p>
+
+      <div id="classifyGapForm" class="modal-form-stack">
+        <input type="hidden" id="classifyGapStart">
+        <input type="hidden" id="classifyGapEnd">
+        <input type="hidden" id="classifyGapGroup">
+        <input type="hidden" id="classifyGapAvailType" value="busy">
+
+        <div class="modal-field-group">
+          <label class="modal-label">Choose Typical Activity</label>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;" id="classifyGapQuickChips">
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('Sleep / Rest', 'Fixed', 'busy')">🌙 Sleep / Rest</button>
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('Meals', 'Fixed', 'busy')">🍽️ Meals</button>
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('Travel', 'Fixed', 'busy')">🚗 Travel</button>
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('College / Work', 'Fixed', 'busy')">🏛️ College / Work</button>
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('Exercise', 'Flexible', 'busy')">🏃 Exercise</button>
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('Personal / Family Time', 'Flexible', 'busy')">👥 Personal / Family</button>
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('Flexible Time', 'Flexible', 'flexible')">⏳ Flexible Time</button>
+            <button type="button" class="interval-classify-chip" onclick="selectGapPreset('Usually Available', 'Flexible', 'available')">✨ Usually Available</button>
+          </div>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Activity Name *</label>
+          <input type="text" id="classifyGapName" name="routineBlockLabel" autocomplete="off" data-lpignore="true" data-form-type="other" readonly onfocus="this.removeAttribute('readonly')" class="modal-input" placeholder="e.g. Rest / Meals / Free time" required>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Commitment Nature</label>
+          <div class="priority-selector-row" id="classifyGapTypeSelector">
+            <button type="button" class="priority-btn classify-type-btn selected" id="classifyTypeFixedBtn" data-type="Fixed" onclick="setClassifyGapType('Fixed')">Fixed</button>
+            <button type="button" class="priority-btn classify-type-btn" id="classifyTypeFlexBtn" data-type="Flexible" onclick="setClassifyGapType('Flexible')">Flexible</button>
+          </div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="handleClassifyGapSubmit(event)">Save & Classify Gap</button>
+          <button type="button" class="btn-secondary-pill" style="border-radius: 12px;" onclick="closeModal('classifyGapModal')">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Delete Routine Confirmation (EKAGRA Styled)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="deleteRoutineModal">
+    <div class="modal-frosted-card modal-delete-card">
+      <button type="button" class="modal-close-btn" onclick="closeModal('deleteRoutineModal')">✕</button>
+      <div class="delete-modal-icon-wrap">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </div>
+      <h3 class="modal-title-lg" style="margin-bottom: 6px;">Delete this routine block?</h3>
+      <div class="delete-goal-target-title" id="deleteRoutineTargetTitle">"Routine Block"</div>
+      <p class="delete-modal-warning">This availability block will be removed.</p>
+      
+      <div class="modal-actions-row" style="margin-top: 24px;">
+        <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="closeModal('deleteRoutineModal')" id="cancelDeleteRoutineBtn">Cancel</button>
+        <button type="button" class="btn-destructive-ekagra" style="flex: 1; border-radius: 12px; padding: 12px;" id="confirmDeleteRoutineBtn">Delete Routine</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Edit Task (EKAGRA Styled)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="editTaskModal">
+    <div class="modal-frosted-card">
+      <button type="button" class="modal-close-btn" onclick="closeModal('editTaskModal')">✕</button>
+      <h3 class="modal-title-lg">Edit Task</h3>
+
+      <form id="editTaskForm" class="modal-form-stack" onsubmit="handleEditTaskFormSubmit(event)">
+        <input type="hidden" id="editTaskId">
+        <input type="hidden" id="editTaskGoalId">
+
+        <div class="modal-field-group">
+          <label class="modal-label">Task Title *</label>
+          <input type="text" id="editTaskTitle" class="modal-input" placeholder="e.g. Master Transformers" required>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Description (optional)</label>
+          <textarea id="editTaskDesc" class="modal-textarea" rows="2" placeholder="Details or notes about this task"></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="modal-field-group">
+            <label class="modal-label">Priority</label>
+            <select id="editTaskPriority" class="modal-select">
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+
+          <div class="modal-field-group">
+            <label class="modal-label">Due Date (optional)</label>
+            <input type="date" id="editTaskDueDate" class="modal-input">
+          </div>
+        </div>
+
+        <div class="modal-field-group">
+          <label class="modal-label">Estimated Duration</label>
+          <div class="inline-duration-group">
+            <input type="number" id="editTaskDuration" min="1" max="1440" class="modal-input" placeholder="Minutes (e.g. 45)">
+            <button type="button" class="btn-ai-estimate-pill" onclick="handleAiEstimateClick(this, '#editTaskAiNotice', '#editTaskDuration')">✨ AI Estimate</button>
+          </div>
+          <div id="editTaskAiNotice" class="inline-ai-notice" style="display: none;"></div>
+          <div id="editTaskAiClarification" class="inline-ai-clarification-box" style="display: none;"></div>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="submit" id="editTaskSubmitBtn" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;">Save Changes</button>
+          <button type="button" class="btn-secondary-pill" style="border-radius: 12px;" onclick="closeModal('editTaskModal')">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Delete Task Confirmation (EKAGRA Styled)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="deleteTaskModal">
+    <div class="modal-frosted-card modal-delete-card">
+      <button type="button" class="modal-close-btn" onclick="closeModal('deleteTaskModal')">✕</button>
+      <div class="delete-modal-icon-wrap">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </div>
+      <h3 class="modal-title-lg" style="margin-bottom: 6px;">Delete this task?</h3>
+      <div class="delete-goal-target-title" id="deleteTaskTargetTitle">"Task Title"</div>
+      <p class="delete-modal-warning">This action cannot be undone. Goal progress will recalculate immediately.</p>
+      
+      <div class="modal-actions-row" style="margin-top: 24px;">
+        <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="closeModal('deleteTaskModal')" id="cancelDeleteTaskBtn">Cancel</button>
+        <button type="button" class="btn-destructive-ekagra" style="flex: 1; border-radius: 12px; padding: 12px;" id="confirmDeleteTaskBtn">Delete Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: Quick Execution Check-In (1-Second Task Completion Popup)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="quickCheckInModal" role="dialog" aria-modal="true" aria-labelledby="quickCheckInTaskTitle">
+    <div class="modal-frosted-card" style="max-width: 440px; padding: 24px;">
+      <button type="button" class="modal-close-btn" onclick="closeModal('quickCheckInModal')" aria-label="Close">✕</button>
+      
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+        <div style="width: 34px; height: 34px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0;">⚡</div>
+        <div style="min-width: 0;">
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--brand-emerald); font-weight: 700;">Quick Check-In</div>
+          <h3 class="modal-title-lg" id="quickCheckInTaskTitle" style="font-size: 1.08rem; margin: 0; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Task Name</h3>
+        </div>
+      </div>
+
+      <p id="quickCheckInPrompt" style="font-size: 0.86rem; color: var(--text-secondary); margin: 8px 0 14px 0; line-height: 1.4;">
+        Estimated: <strong id="quickCheckInEstDisplay" style="color: var(--text-primary);">30 min</strong> — How long did it actually take?
+      </p>
+
+      <!-- 1-Tap Chips Container -->
+      <div id="quickCheckInChipsContainer" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;"></div>
+
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <input type="number" id="quickCheckInMinutesInput" min="1" max="999" class="modal-input" style="font-size: 1.15rem; font-weight: 700; text-align: center; width: 110px; padding: 8px;" oninput="onQuickCheckInInputChange()">
+        <span style="font-size: 0.92rem; font-weight: 600; color: var(--text-muted);">minutes</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button type="button" class="btn-primary-emerald" id="quickCheckInConfirmBtn" style="width: 100%; justify-content: center; padding: 11px; font-size: 0.92rem; border-radius: 12px;" onclick="submitQuickCheckIn(true)">
+          ✓ Confirm & Complete
+        </button>
+        <button type="button" id="quickCheckInSkipBtn" style="background: none; border: none; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; padding: 6px; text-align: center; transition: color 0.15s ease;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'" onclick="submitQuickCheckIn(false)">
+          Skip timing
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: AI Estimation Provider Selection (EKAGRA Styled)
+       ========================================================================== -->
+  <div class="modal-backdrop-overlay" id="aiProviderSelectModal">
+    <div class="modal-frosted-card" style="max-width: 480px;">
+      <button type="button" class="modal-close-btn" onclick="closeModal('aiProviderSelectModal')">✕</button>
+      
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+        <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+          ✨
+        </div>
+        <h3 class="modal-title-lg" style="margin: 0;">AI Duration Estimation</h3>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 18px;">How would you like to use AI estimation?</p>
+
+      <div class="ai-modal-options-stack">
+        <!-- Option 1: EKAGRA Default AI -->
+        <div class="ai-modal-choice-box" id="aiModalChoiceDefault" onclick="selectAiModalChoice('default')">
+          <div class="ai-modal-choice-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="aiModalMode" value="default" id="aiModalRadioDefault">
+              <span class="ai-modal-choice-title">Use EKAGRA's default AI</span>
+            </div>
+            <span class="ai-badge-sm" id="aiModalDefaultBadge">Checking...</span>
+          </div>
+          <p class="ai-modal-choice-desc" id="aiModalDefaultDesc">
+            Uses server-configured Gemini provider. Server availability and usage limits apply.
+          </p>
+        </div>
+
+        <!-- Option 2: Use My Own API Key -->
+        <div class="ai-modal-choice-box" id="aiModalChoiceUserKey" onclick="selectAiModalChoice('user_key')">
+          <div class="ai-modal-choice-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="radio" name="aiModalMode" value="user_key" id="aiModalRadioUserKey">
+              <span class="ai-modal-choice-title">Use my own API key</span>
+            </div>
+            <span class="ai-badge-sm" id="aiModalUserKeyBadge">Google Gemini</span>
+          </div>
+          <p class="ai-modal-choice-desc">
+            Supply your own Gemini API key. Stored encrypted (AES-256-GCM) on the server.
+          </p>
+
+          <!-- Input expanded when user_key is selected -->
+          <div id="aiModalKeyInputSection" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border);">
+            <label class="modal-label" style="font-size: 0.78rem;">Gemini API Key</label>
+            <div class="ai-key-input-wrapper">
+              <input type="password" id="aiModalApiKeyInput" class="modal-input" placeholder="Paste your Gemini API key" autocomplete="off">
+              <button type="button" class="btn-toggle-eye" onclick="event.stopPropagation(); toggleApiKeyVisibility('aiModalApiKeyInput', this)">👁️</button>
+            </div>
+            <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 4px;">
+              Create a standard API key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--brand-emerald); text-decoration: underline;">Google AI Studio</a>. You can change or remove your key anytime in Settings.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="aiModalNotice" class="inline-ai-notice" style="display: none; margin-top: 12px;"></div>
+
+      <div class="modal-actions-row" style="margin-top: 20px;">
+        <button type="button" class="btn-primary-emerald" style="flex: 2; border-radius: 12px; padding: 12px;" id="aiModalConfirmBtn" onclick="confirmAiModalChoice()">
+          Save & Proceed to Estimate
+        </button>
+        <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="closeModal('aiProviderSelectModal')">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL: Gemini API Key Setup & Management
+       ====================================================================== -->
+  <div class="modal-backdrop-overlay" id="aiKeyModal">
+    <div class="modal-frosted-card" style="max-width: 480px;">
+      <button type="button" class="modal-close-btn" onclick="closeModal('aiKeyModal')">✕</button>
+      <h3 class="modal-title-lg" id="aiKeyModalTitle" style="margin-bottom: 4px;">Gemini API Key</h3>
+      <p style="font-size: 0.84rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.45;">
+        Get your personal Gemini API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--brand-emerald); font-weight: 600; text-decoration: underline;">Google AI Studio</a>. Keys are encrypted at rest with AES-256-GCM and never returned in plaintext.
+      </p>
+
+      <form id="aiKeyModalForm" class="modal-form-stack" onsubmit="handleSaveAiKeyFromModal(event); return false;">
+        <div class="modal-field-group">
+          <label class="modal-label" for="modalGeminiApiKey">Gemini API Key *</label>
+          <div class="ai-key-input-wrapper">
+            <input type="password" id="modalGeminiApiKey" class="modal-input" placeholder="Paste your Gemini API key" required autocomplete="off">
+            <button type="button" class="btn-toggle-eye" id="toggleModalKeyEyeBtn" onclick="toggleApiKeyVisibility('modalGeminiApiKey', this)" title="Show or hide key">
+              👁️
+            </button>
+          </div>
+          <div class="ai-field-tip">
+            Obtain a standard API key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--brand-emerald); text-decoration: underline;">https://aistudio.google.com/apikey</a>. Note: Service account authorization keys (AQ.) require OAuth and are not supported for direct REST API access.
+          </div>
+        </div>
+
+        <div id="modalAiKeyErrorMsg" class="inline-ai-notice" style="display: none; margin-top: 8px;"></div>
+
+        <div class="modal-actions-row" style="margin-top: 18px;">
+          <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="closeModal('aiKeyModal')">
+            Cancel
+          </button>
+          <button type="submit" class="btn-primary-emerald" id="saveModalAiKeyBtn" onclick="handleSaveAiKeyFromModal(event)" style="flex: 2; border-radius: 12px; padding: 12px;">
+            Save API Key
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

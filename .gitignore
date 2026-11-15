@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Environment variables & secrets (NEVER commit)
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Local SQLite database & user data
+data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+
+# Build and Vercel artifacts
+.vercel/
+dist/
+build/
+
+# Logs & OS files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
