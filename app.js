@@ -7,7 +7,59 @@
  * 4. Interactive Zero-Friction badge verification toggle
  */
 
+/**
+ * Cached session check for landing page CTAs.
+ * Evaluated immediately on script load so clicking "Start with EKAGRA" / "Launch EKAGRA"
+ * responds instantly without delay.
+ */
+const authSessionPromise = (async () => {
+  try {
+    const res = await fetch('/api/auth/me', {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    });
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    return Boolean(data && data.user && data.user.id);
+  } catch (err) {
+    return false;
+  }
+})();
+
+async function handleSmartCtaClick(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  try {
+    const isAuthenticated = await authSessionPromise;
+    if (isAuthenticated) {
+      window.location.href = '/dashboard';
+    } else {
+      window.location.href = '/login';
+    }
+  } catch (err) {
+    window.location.href = '/login';
+  }
+}
+
+function initSmartCtaButtons() {
+  const ctaElements = [
+    document.getElementById('heroPrimaryCta'),
+    document.getElementById('btnLaunchEkagra'),
+    ...document.querySelectorAll('.btn-hero-primary, .btn-cta-launch')
+  ].filter(Boolean);
+
+  const uniqueCtas = Array.from(new Set(ctaElements));
+  uniqueCtas.forEach((btn) => {
+    btn.removeEventListener('click', handleSmartCtaClick);
+    btn.addEventListener('click', handleSmartCtaClick);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initSmartCtaButtons();
   initParticleField();
   initFallingLeaves();
   initPerLetterHover();
@@ -19,6 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initAboutSnakeScroll();
   initMomentumScrolling();
 });
+
+if (document.readyState === 'interactive' || document.readyState === 'complete') {
+  initSmartCtaButtons();
+}
 
 /**
  * 1. Per-Letter Independent Hover Animation on "EKAGRA":
@@ -311,6 +367,15 @@ function initExtendedInteractions() {
 
   // Smooth Scrolling for in-page anchors integrated with momentum engine
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    // Explicitly exclude smart CTA buttons from in-page scroll interception
+    if (
+      anchor.id === 'heroPrimaryCta' ||
+      anchor.id === 'btnLaunchEkagra' ||
+      anchor.classList.contains('btn-hero-primary') ||
+      anchor.classList.contains('btn-cta-launch')
+    ) {
+      return;
+    }
     anchor.addEventListener('click', function(e) {
       const targetId = this.getAttribute('href');
       if (!targetId || targetId === '#' || targetId === '#signin' || targetId === '#signup') return;
