@@ -403,7 +403,16 @@ function runMigrationsSync(db) {
 
 async function runMigrationsAsync(db) {
   // Ensure Foreign Keys are strictly enforced in SQLite / Turso
-  await db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
+  try {
+    await db.exec('PRAGMA foreign_keys = ON;');
+  } catch (err) {
+    console.warn('[Migration Warning] foreign_keys pragma:', err.message);
+  }
+  try {
+    await db.exec('PRAGMA journal_mode = WAL;');
+  } catch (err) {
+    // Turso Cloud manages journaling internally; ignore if unsupported
+  }
 
   // Migration 001: Users table
   await db.exec(`
@@ -522,7 +531,7 @@ async function runMigrationsAsync(db) {
 
   // Migration 006: Routines table & extended task metadata
   try {
-    const taskCols = (await db.prepare("PRAGMA table_info('tasks')").all()).map((c) => c.name);
+    const taskCols = (await db.prepare("PRAGMA table_info('tasks')").all()).map((c) => c && (c.name || c[1])).filter(Boolean);
     if (!taskCols.includes('description')) {
       await db.exec("ALTER TABLE tasks ADD COLUMN description TEXT DEFAULT ''");
     }
@@ -566,7 +575,7 @@ async function runMigrationsAsync(db) {
   `);
 
   try {
-    const routineCols = (await db.prepare("PRAGMA table_info('routines')").all()).map((c) => c.name);
+    const routineCols = (await db.prepare("PRAGMA table_info('routines')").all()).map((c) => c && (c.name || c[1])).filter(Boolean);
     if (!routineCols.includes('schedule_group')) {
       await db.exec("ALTER TABLE routines ADD COLUMN schedule_group TEXT DEFAULT 'weekdays'");
     }
@@ -606,7 +615,7 @@ async function runMigrationsAsync(db) {
 
   // Migration 008: Additive routine metadata
   try {
-    const routineCols = (await db.prepare("PRAGMA table_info('routines')").all()).map((c) => c.name);
+    const routineCols = (await db.prepare("PRAGMA table_info('routines')").all()).map((c) => c && (c.name || c[1])).filter(Boolean);
     if (!routineCols.includes('activity_classification')) {
       await db.exec("ALTER TABLE routines ADD COLUMN activity_classification TEXT DEFAULT ''");
     }
@@ -694,7 +703,7 @@ async function runMigrationsAsync(db) {
   `);
 
   try {
-    const sbCols = (await db.prepare("PRAGMA table_info('scheduled_blocks')").all()).map((c) => c.name);
+    const sbCols = (await db.prepare("PRAGMA table_info('scheduled_blocks')").all()).map((c) => c && (c.name || c[1])).filter(Boolean);
     if (!sbCols.includes('time_bucket')) {
       await db.exec("ALTER TABLE scheduled_blocks ADD COLUMN time_bucket TEXT DEFAULT 'morning'");
     }
@@ -704,7 +713,7 @@ async function runMigrationsAsync(db) {
   } catch (err) {}
 
   try {
-    const profCols = (await db.prepare("PRAGMA table_info('user_learning_profile')").all()).map((c) => c.name);
+    const profCols = (await db.prepare("PRAGMA table_info('user_learning_profile')").all()).map((c) => c && (c.name || c[1])).filter(Boolean);
     if (!profCols.includes('pace_factor')) {
       await db.exec("ALTER TABLE user_learning_profile ADD COLUMN pace_factor REAL DEFAULT 1.0");
     }
@@ -742,7 +751,7 @@ async function runMigrationsAsync(db) {
 
   // Migration 011: Verified Task Duration Check-In & Calibration Counter
   try {
-    const elCols = (await db.prepare("PRAGMA table_info('execution_logs')").all()).map((c) => c.name);
+    const elCols = (await db.prepare("PRAGMA table_info('execution_logs')").all()).map((c) => c && (c.name || c[1])).filter(Boolean);
     if (!elCols.includes('duration_verified')) {
       await db.exec("ALTER TABLE execution_logs ADD COLUMN duration_verified INTEGER DEFAULT 0");
     }
@@ -751,7 +760,7 @@ async function runMigrationsAsync(db) {
   }
 
   try {
-    const profCols = (await db.prepare("PRAGMA table_info('user_learning_profile')").all()).map((c) => c.name);
+    const profCols = (await db.prepare("PRAGMA table_info('user_learning_profile')").all()).map((c) => c && (c.name || c[1])).filter(Boolean);
     if (!profCols.includes('calibrated_count')) {
       await db.exec("ALTER TABLE user_learning_profile ADD COLUMN calibrated_count INTEGER DEFAULT 0");
     }
