@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 const config = require('../config');
-const { runMigrations, runMigrationsSync, runMigrationsAsync } = require('./migrations');
+const { runMigrations, runMigrationsSync, runMigrationsAsync, LATEST_SCHEMA_VERSION } = require('./migrations');
 
 let dbInstance = null;
 let migrationPromise = null;
@@ -287,4 +287,5 @@ module.exports = {
   runMigrations,
   runMigrationsSync,
   runMigrationsAsync,
+  LATEST_SCHEMA_VERSION,
 };

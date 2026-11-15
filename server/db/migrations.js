@@ -1,7 +1,78 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const LATEST_SCHEMA_VERSION = 12;
+
+function checkSchemaVersionSync(db) {
+  try {
+    const row = db.prepare("SELECT version FROM schema_meta WHERE key = 'ekagra_schema'").get();
+    if (row && typeof row.version === 'number' && row.version >= LATEST_SCHEMA_VERSION) {
+      return true;
+    }
+  } catch (err) {
+    // schema_meta does not exist yet; proceed with migration
+  }
+  return false;
+}
+
+async function checkSchemaVersionAsync(db) {
+  try {
+    const row = await db.prepare("SELECT version FROM schema_meta WHERE key = 'ekagra_schema'").get();
+    if (row && typeof row.version === 'number' && row.version >= LATEST_SCHEMA_VERSION) {
+      return true;
+    }
+  } catch (err) {
+    // schema_meta does not exist yet; proceed with migration
+  }
+  return false;
+}
+
+function recordSchemaVersionSync(db) {
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_meta (
+        key TEXT PRIMARY KEY,
+        version INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO schema_meta (key, version, updated_at)
+      VALUES ('ekagra_schema', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at
+    `).run(LATEST_SCHEMA_VERSION, now);
+  } catch (err) {
+    console.warn('[Migration Warning] recording schema version (sync):', err.message);
+  }
+}
+
+async function recordSchemaVersionAsync(db) {
+  try {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_meta (
+        key TEXT PRIMARY KEY,
+        version INTEGER NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `);
+    const now = new Date().toISOString();
+    await db.prepare(`
+      INSERT INTO schema_meta (key, version, updated_at)
+      VALUES ('ekagra_schema', ?, ?)
+      ON CONFLICT(key) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at
+    `).run(LATEST_SCHEMA_VERSION, now);
+  } catch (err) {
+    console.warn('[Migration Warning] recording schema version (async):', err.message);
+  }
+}
+
 function runMigrationsSync(db) {
+  // Fast schema check: if already at or above LATEST_SCHEMA_VERSION, skip all migration queries
+  if (checkSchemaVersionSync(db)) {
+    return true;
+  }
+
   // Ensure Foreign Keys are strictly enforced in SQLite
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec('PRAGMA journal_mode = WAL;');
@@ -398,10 +469,18 @@ function runMigrationsSync(db) {
     console.error('[Migration 012 deduplicate scheduled blocks error]', err);
   }
 
+  // Record schema version in metadata table
+  recordSchemaVersionSync(db);
+
   return true;
 }
 
 async function runMigrationsAsync(db) {
+  // Fast schema check: 1 single fast query to skip all migration scripts if already migrated
+  if (await checkSchemaVersionAsync(db)) {
+    return true;
+  }
+
   // Ensure Foreign Keys are strictly enforced in SQLite / Turso
   try {
     await db.exec('PRAGMA foreign_keys = ON;');
@@ -806,6 +885,9 @@ async function runMigrationsAsync(db) {
     console.error('[Migration 012 deduplicate scheduled blocks error]', err);
   }
 
+  // Record schema version in metadata table
+  await recordSchemaVersionAsync(db);
+
   return true;
 }
 
@@ -819,5 +901,6 @@ function runMigrations(db) {
 module.exports = {
   runMigrations,
   runMigrationsSync,
-  runMigrationsAsync
+  runMigrationsAsync,
+  LATEST_SCHEMA_VERSION
 };

@@ -211,57 +211,139 @@ const Store = {
     }, 400);
   },
 
-  // Load initial data from backend API
+  // Stale-While-Revalidate: Instant synchronous cache hydration in < 10ms
+  tryHydrateFromCache(targetUid = null) {
+    try {
+      const uid = targetUid || localStorage.getItem('ekagra_last_uid') || sessionStorage.getItem('ekagra_last_uid');
+      if (!uid) return false;
+
+      const raw = localStorage.getItem(`ekagra_cache_${uid}`) || sessionStorage.getItem(`ekagra_cache_${uid}`);
+      if (!raw) return false;
+
+      const cached = JSON.parse(raw);
+      if (!cached || !cached.state || !cached.user || !cached.user.id) return false;
+
+      // Hydrate state from cache
+      this.state = {
+        ...this.state,
+        ...cached.state,
+        user: cached.user
+      };
+      this.isLoaded = true;
+
+      // Fast synchronous paint
+      renderTopBar(this.state);
+      renderCurrentView(this.state);
+      if (typeof window.updateGlobalRoutineBanner === 'function') {
+        window.updateGlobalRoutineBanner(this.state);
+      }
+      return true;
+    } catch (e) {
+      console.warn('Failed to hydrate from cache:', e);
+      return false;
+    }
+  },
+
+  saveSnapshotToCache(userId, state) {
+    try {
+      if (!userId || !state) return;
+      const snapshot = {
+        timestamp: Date.now(),
+        user: state.user,
+        state: {
+          user: state.user,
+          isColdStart: Boolean(state.isColdStart),
+          currentView: state.currentView || 'home',
+          goals: state.goals || [],
+          tasks: state.tasks || [],
+          routines: state.routines || [],
+          insightsData: state.insightsData || null,
+          todaySchedule: state.todaySchedule || { blocks: [], routines: [] },
+          routine_coverage_status: state.routine_coverage_status || null,
+          routine_coverage_incomplete: Boolean(state.routine_coverage_incomplete),
+          is_routine_complete: Boolean(state.is_routine_complete),
+          incomplete_group: state.incomplete_group || null,
+          routine_warning_message: state.routine_warning_message || null,
+          scheduleSettings: state.scheduleSettings,
+          metrics: state.metrics,
+          insights: state.insights || [],
+          activities: state.activities || [],
+          user_preferences: state.user_preferences
+        }
+      };
+      const serialized = JSON.stringify(snapshot);
+      localStorage.setItem(`ekagra_cache_${userId}`, serialized);
+      localStorage.setItem('ekagra_last_uid', String(userId));
+      sessionStorage.setItem(`ekagra_cache_${userId}`, serialized);
+      sessionStorage.setItem('ekagra_last_uid', String(userId));
+    } catch (e) {
+      console.warn('Failed to save snapshot to cache:', e);
+    }
+  },
+
+  clearLocalCache() {
+    try {
+      const localKeys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('ekagra_cache_') || k === 'ekagra_last_uid')) {
+          localKeys.push(k);
+        }
+      }
+      localKeys.forEach((k) => localStorage.removeItem(k));
+
+      const sessionKeys = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k && (k.startsWith('ekagra_cache_') || k === 'ekagra_last_uid')) {
+          sessionKeys.push(k);
+        }
+      }
+      sessionKeys.forEach((k) => sessionStorage.removeItem(k));
+    } catch (e) {}
+  },
+
+  // Load initial data from unified bootstrap endpoint
   async init() {
-    // 0. Render real client date and time greeting immediately
     renderCurrentDateAndGreeting();
 
+    const cachedUid = localStorage.getItem('ekagra_last_uid') || sessionStorage.getItem('ekagra_last_uid');
+    let hasHydratedFromCache = false;
+    if (cachedUid) {
+      hasHydratedFromCache = this.tryHydrateFromCache(cachedUid);
+    }
+
     try {
-      // 1. Fetch authenticated user session
-      const authRes = await fetch('/api/auth/me');
-      if (authRes.status === 401 || !authRes.ok) {
+      // 1 single round-trip bootstrap call
+      const res = await fetch('/api/dashboard/bootstrap');
+      if (res.status === 401 || !res.ok) {
+        this.clearLocalCache();
         window.location.replace('/login');
         return;
       }
-      const authData = await authRes.json();
-      if (!authData || !authData.user) {
+
+      const bootstrap = await res.json();
+      if (!bootstrap || !bootstrap.user) {
+        this.clearLocalCache();
         window.location.replace('/login');
         return;
+      }
+
+      // Check if user changed from cached user
+      if (cachedUid && String(cachedUid) !== String(bootstrap.user.id)) {
+        this.clearLocalCache();
       }
 
       const activeUser = {
-        name: authData.user.displayName || authData.user.name || 'User',
-        email: authData.user.email || '',
-        id: authData.user.id,
-        created_at: authData.user.created_at
+        name: bootstrap.user.displayName || bootstrap.user.name || 'User',
+        email: bootstrap.user.email || '',
+        id: bootstrap.user.id,
+        created_at: bootstrap.user.created_at
       };
 
-      // Hydrate user profile immediately into state and top bar
-      this.state.user = activeUser;
-      renderTopBar(this.state);
-
-      // 2. Fetch user-isolated dashboard state, today's schedule, and insights in parallel
-      let dashData = { goals: [], tasks: [], routines: [], metrics: null, insights: [], activities: [] };
-      let todayScheduleData = { blocks: [], routines: [], routine_coverage_status: null };
-      let insightsDataPayload = null;
-      try {
-        const [dashRes, schedRes, insightsRes] = await Promise.all([
-          fetch('/api/dashboard/data'),
-          fetch('/api/schedule?date=today').catch(() => null),
-          fetch('/api/insights').catch(() => null)
-        ]);
-        if (dashRes && dashRes.ok) {
-          dashData = await dashRes.json();
-        }
-        if (schedRes && schedRes.ok) {
-          todayScheduleData = await schedRes.json();
-        }
-        if (insightsRes && insightsRes.ok) {
-          insightsDataPayload = await insightsRes.json();
-        }
-      } catch (e) {
-        console.warn('Dashboard data fetch failed, using fallback empty state:', e);
-      }
+      const dashData = bootstrap.dashboardData || {};
+      const todayScheduleData = bootstrap.todaySchedule || {};
+      const insightsDataPayload = bootstrap.insightsData || null;
 
       const rawTasks = Array.isArray(dashData.tasks) ? dashData.tasks : [];
       const rawGoals = Array.isArray(dashData.goals) ? dashData.goals : [];
@@ -286,7 +368,8 @@ const Store = {
         todaySchedule: {
           blocks: todayScheduleData.blocks || [],
           routines: todayScheduleData.routines || [],
-          coverageStatus: covStatus
+          coverageStatus: covStatus,
+          next_task: todayScheduleData.next_task || null
         },
         routine_coverage_status: covStatus,
         routine_coverage_incomplete: covStatus ? covStatus.routine_coverage_incomplete : Boolean(dashData.routine_coverage_incomplete),
@@ -308,13 +391,26 @@ const Store = {
         },
         insights: Array.isArray(dashData.insights) ? dashData.insights : [],
         activities: Array.isArray(dashData.activities) ? dashData.activities : [],
-        user_preferences: dashData.preferences || { notify_tasks: true, notify_goals: true, notify_weekly: true }
+        user_preferences: dashData.preferences || dashData.user_preferences || { notify_tasks: true, notify_goals: true, notify_weekly: true }
       };
 
       this.isLoaded = true;
-      this.notify();
-      if (typeof window.updateGlobalRoutineBanner === 'function') {
-        window.updateGlobalRoutineBanner(this.state);
+
+      // Persist fresh snapshot to cache for instant sub-10ms loads on future refreshes
+      this.saveSnapshotToCache(activeUser.id, this.state);
+
+      // Smooth re-render: preserve open modals and active input focus
+      const activeEl = document.activeElement;
+      const isInputFocused = activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName);
+      const isModalOpen = Boolean(document.querySelector('.modal-backdrop-overlay.active'));
+
+      renderTopBar(this.state);
+      if (!isModalOpen && !isInputFocused) {
+        renderCurrentView(this.state);
+      } else {
+        if (typeof window.updateGlobalRoutineBanner === 'function') {
+          window.updateGlobalRoutineBanner(this.state);
+        }
       }
 
       // Determine routine setup eligibility from authoritative backend status & routine configuration
@@ -337,27 +433,29 @@ const Store = {
       }
     } catch (err) {
       console.error('Failed to initialize dashboard store:', err);
-      // Fallback: Still render the dashboard safely with available user and empty state
-      this.isLoaded = true;
-      this.state = {
-        ...this.state,
-        user: this.state.user && this.state.user.name ? this.state.user : { name: 'User', email: '' },
-        isColdStart: true,
-        goals: [],
-        tasks: [],
-        routines: [],
-        metrics: {
-          completedToday: 0,
-          missedToday: 0,
-          rescheduledToday: 0,
-          streak: 0,
-          focusHours: 0,
-          totalCompletedTasks: 0
-        },
-        insights: [],
-        activities: []
-      };
-      this.notify();
+      // Fallback: If network failed but cache hydrated, keep cached data! Otherwise safe cold state
+      if (!hasHydratedFromCache) {
+        this.isLoaded = true;
+        this.state = {
+          ...this.state,
+          user: this.state.user && this.state.user.name ? this.state.user : { name: 'User', email: '' },
+          isColdStart: true,
+          goals: [],
+          tasks: [],
+          routines: [],
+          metrics: {
+            completedToday: 0,
+            missedToday: 0,
+            rescheduledToday: 0,
+            streak: 0,
+            focusHours: 0,
+            totalCompletedTasks: 0
+          },
+          insights: [],
+          activities: []
+        };
+        this.notify();
+      }
     }
   },
 
@@ -406,6 +504,52 @@ window.Store = Store;
 // Bootstrapping & View Router
 // ==========================================================================
 
+function renderDashboardSkeletons() {
+  const nextTaskBox = document.getElementById('homeNextTaskContainer');
+  if (nextTaskBox && !nextTaskBox.innerHTML.trim()) {
+    nextTaskBox.innerHTML = `
+      <div class="skeleton-shimmer" style="height: 104px; margin-bottom: 14px;"></div>
+      <div class="skeleton-row">
+        <div class="skeleton-shimmer" style="height: 38px; flex: 1;"></div>
+        <div class="skeleton-shimmer" style="height: 38px; width: 110px;"></div>
+      </div>
+    `;
+  }
+
+  const timelineBox = document.getElementById('homeTimelineList');
+  if (timelineBox && !timelineBox.innerHTML.trim()) {
+    timelineBox.innerHTML = `
+      <div class="skeleton-shimmer" style="height: 48px; margin-bottom: 8px;"></div>
+      <div class="skeleton-shimmer" style="height: 48px; margin-bottom: 8px;"></div>
+      <div class="skeleton-shimmer" style="height: 48px;"></div>
+    `;
+  }
+
+  const goalsOverview = document.getElementById('homeGoalsOverviewList');
+  if (goalsOverview && !goalsOverview.innerHTML.trim()) {
+    goalsOverview.innerHTML = `
+      <div class="skeleton-shimmer" style="height: 46px; margin-bottom: 8px;"></div>
+      <div class="skeleton-shimmer" style="height: 46px;"></div>
+    `;
+  }
+
+  const insightsFeed = document.getElementById('homeInsightsFeed');
+  if (insightsFeed && !insightsFeed.innerHTML.trim()) {
+    insightsFeed.innerHTML = `
+      <div class="skeleton-shimmer" style="height: 64px; margin-bottom: 8px;"></div>
+      <div class="skeleton-shimmer" style="height: 64px;"></div>
+    `;
+  }
+
+  const activityFeed = document.getElementById('homeActivityFeed');
+  if (activityFeed && !activityFeed.innerHTML.trim()) {
+    activityFeed.innerHTML = `
+      <div class="skeleton-shimmer" style="height: 36px; margin-bottom: 8px;"></div>
+      <div class="skeleton-shimmer" style="height: 36px;"></div>
+    `;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   renderCurrentDateAndGreeting();
   initTheme();
@@ -414,8 +558,14 @@ document.addEventListener('DOMContentLoaded', () => {
   initModals();
   initDeveloperConsole();
 
-  // Render topbar with real client date and initial time greeting immediately
-  renderTopBar(Store.state);
+  // 1. Instant Stale-While-Revalidate Hydration (< 10ms paint)
+  const hasHydrated = Store.tryHydrateFromCache();
+
+  // If no cache exists (first ever visit or fresh incognito), show subtle shimmer skeletons
+  if (!hasHydrated) {
+    renderTopBar(Store.state);
+    renderDashboardSkeletons();
+  }
 
   // Subscribe UI renders to state changes
   Store.subscribe((state) => {
@@ -426,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Load backend state
+  // Load backend state (revalidation in parallel)
   Store.init();
 });
 
@@ -536,10 +686,11 @@ function initTopBar() {
   const menuSignout = document.getElementById('menuSignoutBtn');
   if (menuSignout) {
     menuSignout.addEventListener('click', async () => {
+      Store.clearLocalCache();
       try {
         await fetch('/api/auth/logout', { method: 'POST' });
       } catch (e) {}
-      window.location.href = '/login';
+      window.location.replace('/login');
     });
   }
 }

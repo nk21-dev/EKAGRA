@@ -491,6 +491,30 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Subtle Shimmer Skeleton Placeholders */
+@keyframes ekagra-skeleton-sweep {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg, 
+    var(--surface-subtle) 20%, 
+    rgba(16, 185, 129, 0.08) 50%, 
+    var(--surface-subtle) 80%
+  );
+  background-size: 200% 100%;
+  animation: ekagra-skeleton-sweep 1.6s infinite ease-in-out;
+  border-radius: 10px;
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* Card Foundation */
 .dash-card {
   background: var(--card-bg);

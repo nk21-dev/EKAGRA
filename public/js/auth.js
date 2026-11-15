@@ -120,6 +120,22 @@ function initLoginForm() {
         throw new Error(data.error || 'Failed to sign in.');
       }
 
+      // Clear any prior cached dashboard snapshots before entering dashboard as new user
+      try {
+        const localKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('ekagra_cache_') || k === 'ekagra_last_uid')) localKeys.push(k);
+        }
+        localKeys.forEach((k) => localStorage.removeItem(k));
+        const sessionKeys = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (k && (k.startsWith('ekagra_cache_') || k === 'ekagra_last_uid')) sessionKeys.push(k);
+        }
+        sessionKeys.forEach((k) => sessionStorage.removeItem(k));
+      } catch (e) {}
+
       // Success: redirect to dashboard replacing login in history
       window.location.replace('/dashboard');
     } catch (err) {
@@ -178,6 +194,22 @@ function initSignupForm() {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create account.');
       }
+
+      // Clear any prior cached dashboard snapshots before entering dashboard as new user
+      try {
+        const localKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('ekagra_cache_') || k === 'ekagra_last_uid')) localKeys.push(k);
+        }
+        localKeys.forEach((k) => localStorage.removeItem(k));
+        const sessionKeys = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (k && (k.startsWith('ekagra_cache_') || k === 'ekagra_last_uid')) sessionKeys.push(k);
+        }
+        sessionKeys.forEach((k) => sessionStorage.removeItem(k));
+      } catch (e) {}
 
       // Success: redirect to dashboard replacing login in history
       window.location.replace('/dashboard');

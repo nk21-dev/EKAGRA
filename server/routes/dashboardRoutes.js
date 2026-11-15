@@ -5,6 +5,8 @@ const { getDatabase } = require('../db');
 const { calculateGoalHealth } = require('../services/goalHealth');
 const { getGoalTaskStats } = require('../services/goalProgress');
 const { getUserScheduleSettings, isRoutineCoverageComplete, getRoutineCoverageStatus } = require('../services/routineService');
+const { getSchedulePayload } = require('./scheduleRoutes');
+const { getInsightsPayload } = require('./insightRoutes');
 
 // Helper: Get & Save User Preferences (Strict User Isolation)
 async function getUserPreferences(db, userId) {
@@ -255,11 +257,8 @@ const SAMPLE_COLLAGE_DATA = {
   ]
 };
 
-// GET /api/dashboard/data
-// Returns user-isolated dashboard state. If new user with 0 records, returns Day-0 Cold Start!
-router.get('/data', requireAuth, async (req, res) => {
-  const db = getDatabase();
-  const userId = req.user.id;
+async function getDashboardDataPayload(db, user) {
+  const userId = user.id;
 
   const rawGoals = await db.prepare(`
     SELECT id, user_id, title, description, priority, target_date, progress, created_at, updated_at
@@ -344,14 +343,14 @@ router.get('/data', requireAuth, async (req, res) => {
 
   if (!row || !row.payload) {
     // Clean Day-0 Cold Start (Zero State)
-    const coverageStatus = await getRoutineCoverageStatus(db, req.user.id);
-    const userPrefs = await getUserPreferences(db, req.user.id);
-    return res.status(200).json({
+    const coverageStatus = await getRoutineCoverageStatus(db, userId);
+    const userPrefs = await getUserPreferences(db, userId);
+    return {
       user: {
-        id: req.user.id,
-        name: req.user.name,
-        email: req.user.email,
-        created_at: req.user.created_at
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        created_at: user.created_at
       },
       isColdStart: formattedGoals.length === 0 && dbTasks.length === 0 && dbRoutines.length === 0,
       goals: formattedGoals,
@@ -377,19 +376,19 @@ router.get('/data', requireAuth, async (req, res) => {
       },
       insights: [],
       activities: []
-    });
+    };
   }
 
   try {
     const savedState = JSON.parse(row.payload);
-    const coverageStatus = await getRoutineCoverageStatus(db, req.user.id);
-    const userPrefs = await getUserPreferences(db, req.user.id);
+    const coverageStatus = await getRoutineCoverageStatus(db, userId);
+    const userPrefs = await getUserPreferences(db, userId);
     // Goals from dedicated table always take priority
     const finalGoals = formattedGoals.length > 0 ? formattedGoals : (Array.isArray(savedState.goals) ? savedState.goals.map(({ category, categoryIcon, ...rest }) => rest) : []);
     const finalTasks = dbTasks.length > 0 ? dbTasks : (savedState.tasks || []);
     const finalRoutines = dbRoutines.length > 0 ? dbRoutines : (savedState.routines || []);
 
-    return res.status(200).json({
+    return {
       ...savedState,
       goals: finalGoals,
       tasks: finalTasks,
@@ -405,15 +404,70 @@ router.get('/data', requireAuth, async (req, res) => {
       preferences: userPrefs,
       user_preferences: userPrefs,
       user: {
-        id: req.user.id,
-        name: req.user.name,
-        email: req.user.email,
-        created_at: req.user.created_at
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        created_at: user.created_at
       },
       isColdStart: finalGoals.length === 0 && finalTasks.length === 0 && finalRoutines.length === 0
-    });
+    };
   } catch (e) {
-    return res.status(500).json({ error: 'Failed to parse saved state' });
+    throw new Error('Failed to parse saved state: ' + e.message);
+  }
+}
+
+// GET /api/dashboard/bootstrap
+// Unified high-speed parallel bootstrap endpoint (1 request instead of 7)
+router.get('/bootstrap', requireAuth, async (req, res) => {
+  const db = getDatabase();
+  const user = req.user;
+  const userId = user.id;
+
+  try {
+    const [dashData, schedData, insightsData] = await Promise.all([
+      getDashboardDataPayload(db, user),
+      getSchedulePayload(db, userId, 'today'),
+      getInsightsPayload(db, userId)
+    ]);
+
+    const safeUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      created_at: user.created_at
+    };
+
+    return res.status(200).json({
+      success: true,
+      user: safeUser,
+      dashboardData: dashData,
+      todaySchedule: schedData,
+      insightsData: insightsData,
+      // Root-level aliases for direct property consumption
+      goals: dashData.goals || [],
+      tasks: dashData.tasks || [],
+      routines: dashData.routines || [],
+      scheduleSettings: dashData.schedule_settings || null,
+      preferences: dashData.preferences || dashData.user_preferences || null,
+      metrics: dashData.metrics || null,
+      isColdStart: Boolean(dashData.isColdStart)
+    });
+  } catch (err) {
+    console.error('[GET /api/dashboard/bootstrap Error]', err);
+    return res.status(500).json({ error: 'Failed to bootstrap dashboard: ' + err.message });
+  }
+});
+
+// GET /api/dashboard/data
+// Returns user-isolated dashboard state. If new user with 0 records, returns Day-0 Cold Start!
+router.get('/data', requireAuth, async (req, res) => {
+  const db = getDatabase();
+  try {
+    const payload = await getDashboardDataPayload(db, req.user);
+    return res.status(200).json(payload);
+  } catch (err) {
+    console.error('[GET /api/dashboard/data Error]', err);
+    return res.status(500).json({ error: 'Failed to fetch dashboard data.' });
   }
 });
 
