@@ -224,7 +224,7 @@
             <div class="card-header-row" style="flex-wrap: nowrap; gap: 8px;">
               <div class="card-header-title" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Today's Schedule</div>
               <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0; white-space: nowrap;">
-                <button type="button" class="btn-secondary-pill" id="homeAutoScheduleBtn" onclick="triggerAutoSchedule()" style="padding: 3px 8px; font-size: 0.72rem; white-space: nowrap; background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald); border-color: rgba(16, 185, 129, 0.3);">⚡ Auto-Schedule Today</button>
+                <button type="button" class="btn-secondary-pill" id="homeAutoScheduleBtn" onclick="triggerAutoSchedule(this)" style="padding: 3px 8px; font-size: 0.72rem; white-space: nowrap; background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald); border-color: rgba(16, 185, 129, 0.3);">⚡ Auto-Schedule Today</button>
                 <a class="card-header-link" onclick="switchView('schedule')" style="white-space: nowrap; flex-shrink: 0;">View all →</a>
               </div>
             </div>
@@ -395,7 +395,7 @@
           </div>
 
           <div style="display: flex; gap: 10px; align-items: center;">
-            <button type="button" class="btn-secondary-pill" id="btnAutoScheduleGoals" onclick="triggerAutoSchedule()" style="background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald); border-color: rgba(16, 185, 129, 0.3);">⚡ Auto-Schedule Goals</button>
+            <button type="button" class="btn-secondary-pill" id="btnAutoScheduleGoals" onclick="triggerAutoSchedule(this)" style="background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald); border-color: rgba(16, 185, 129, 0.3);">⚡ Auto-Schedule Goals</button>
             <div class="view-mode-toggle">
               <button type="button" class="view-mode-btn schedule-mode-btn active" data-mode="Day" onclick="setScheduleViewMode('Day')">Day</button>
               <button type="button" class="view-mode-btn schedule-mode-btn" data-mode="Week" onclick="setScheduleViewMode('Week')">Week</button>
@@ -1376,10 +1376,10 @@
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button type="button" class="btn-primary-emerald" id="quickCheckInConfirmBtn" style="width: 100%; justify-content: center; padding: 11px; font-size: 0.92rem; border-radius: 12px;" onclick="submitQuickCheckIn(true)">
+        <button type="button" class="btn-primary-emerald" id="quickCheckInConfirmBtn" style="width: 100%; justify-content: center; padding: 11px; font-size: 0.92rem; border-radius: 12px;" onclick="submitQuickCheckIn(true, this)">
           ✓ Confirm & Complete
         </button>
-        <button type="button" id="quickCheckInSkipBtn" style="background: none; border: none; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; padding: 6px; text-align: center; transition: color 0.15s ease;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'" onclick="submitQuickCheckIn(false)">
+        <button type="button" id="quickCheckInSkipBtn" style="background: none; border: none; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; text-decoration: underline; padding: 6px; text-align: center; transition: color 0.15s ease;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'" onclick="submitQuickCheckIn(false, this)">
           Skip timing
         </button>
       </div>

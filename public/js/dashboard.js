@@ -51,7 +51,7 @@ const activeActionLocks = new Set();
  * - Disables the button, sets aria-busy="true", preserves original text/HTML, and sets loading label
  * - Restores button state on complete or error
  */
-async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask, customBusyMessage) {
+async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask, customBusyMessage, options = {}) {
   if (activeActionLocks.has(lockKey)) {
     if (typeof showToast === 'function') {
       showToast(customBusyMessage || 'Please wait — processing your previous request...', 'info');
@@ -70,6 +70,8 @@ async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask
 
   let originalHtml = null;
   let originalDisabled = false;
+  const siblingBtns = [];
+  const opts = (typeof options === 'object' && options !== null) ? options : {};
 
   if (btn) {
     originalHtml = btn.innerHTML;
@@ -79,6 +81,16 @@ async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask
     btn.classList.add('btn-action-locked');
     if (loadingLabel) {
       btn.innerHTML = `<span class="btn-spinner"></span> ${loadingLabel}`;
+    }
+
+    if (opts.disableSiblings && btn.parentElement) {
+      const siblings = Array.from(btn.parentElement.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]')).filter((b) => b !== btn);
+      siblings.forEach((s) => {
+        siblingBtns.push({ el: s, origDisabled: s.disabled });
+        s.disabled = true;
+        s.setAttribute('aria-busy', 'true');
+        s.classList.add('btn-action-locked');
+      });
     }
   }
 
@@ -94,12 +106,17 @@ async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask
         btn.innerHTML = originalHtml;
       }
     }
+    siblingBtns.forEach(({ el, origDisabled }) => {
+      el.disabled = origDisabled;
+      el.removeAttribute('aria-busy');
+      el.classList.remove('btn-action-locked');
+    });
   }
 }
 
 window.withActionLock = withActionLock;
 
-window.updateGlobalRoutineBanner = function(state) {
+window.updateGlobalRoutineBanner = function (state) {
   const banner = document.getElementById('globalRoutineIncompleteBanner');
   if (!banner) return;
 
@@ -139,7 +156,7 @@ window.updateGlobalRoutineBanner = function(state) {
   }
 };
 
-window.copyWeekdaysToWeekends = async function() {
+window.copyWeekdaysToWeekends = async function () {
   const btn = document.getElementById('btnCopyWeekdaysToWeekends') || document.querySelector('[onclick="copyWeekdaysToWeekends()"]');
   return withActionLock('copyWeekdaysToWeekends', btn, 'Copying...', async () => {
     try {
@@ -173,7 +190,7 @@ window.copyWeekdaysToWeekends = async function() {
   });
 };
 
-window.copyWeekdaysToWeekendsInModal = async function() {
+window.copyWeekdaysToWeekendsInModal = async function () {
   const weekdayBlocks = (typeof initialSetupBlocks !== 'undefined') ? initialSetupBlocks.filter((b) => b.schedule_group === 'weekdays') : [];
   if (weekdayBlocks.length > 0) {
     const nonWeekendBlocks = initialSetupBlocks.filter((b) => b.schedule_group !== 'weekends');
@@ -386,7 +403,7 @@ const Store = {
         }
       }
       sessionKeys.forEach((k) => sessionStorage.removeItem(k));
-    } catch (e) {}
+    } catch (e) { }
   },
 
   // Load initial data from unified bootstrap endpoint
@@ -778,7 +795,7 @@ function initTopBar() {
       Store.clearLocalCache();
       try {
         await fetch('/api/auth/logout', { method: 'POST' });
-      } catch (e) {}
+      } catch (e) { }
       window.location.replace('/login');
     });
   }
@@ -889,7 +906,7 @@ function renderCurrentView(state) {
 let isTaskActionInFlight = false;
 let activeCheckInTask = null;
 
-window.openQuickCheckInModal = function(taskId) {
+window.openQuickCheckInModal = function (taskId) {
   let task = (Store.state.tasks || []).find((t) => t.id === taskId);
   let block = null;
   if (Store.state.todaySchedule && Array.isArray(Store.state.todaySchedule.blocks)) {
@@ -938,6 +955,19 @@ window.openQuickCheckInModal = function(taskId) {
     `).join('');
   }
 
+  const confirmBtn = document.getElementById('quickCheckInConfirmBtn');
+  const skipBtn = document.getElementById('quickCheckInSkipBtn');
+  if (confirmBtn) {
+    confirmBtn.disabled = false;
+    confirmBtn.removeAttribute('aria-busy');
+    confirmBtn.classList.remove('btn-action-locked');
+  }
+  if (skipBtn) {
+    skipBtn.disabled = false;
+    skipBtn.removeAttribute('aria-busy');
+    skipBtn.classList.remove('btn-action-locked');
+  }
+
   window.openModal('quickCheckInModal');
   setTimeout(() => {
     inputEl?.focus();
@@ -945,7 +975,7 @@ window.openQuickCheckInModal = function(taskId) {
   }, 100);
 };
 
-window.selectQuickCheckInChip = function(val, chipEl) {
+window.selectQuickCheckInChip = function (val, chipEl) {
   const inputEl = document.getElementById('quickCheckInMinutesInput');
   if (inputEl) {
     inputEl.value = Math.max(1, parseInt(val, 10));
@@ -956,7 +986,7 @@ window.selectQuickCheckInChip = function(val, chipEl) {
   if (chipEl) chipEl.classList.add('active');
 };
 
-window.onQuickCheckInInputChange = function() {
+window.onQuickCheckInInputChange = function () {
   const inputEl = document.getElementById('quickCheckInMinutesInput');
   const curVal = parseInt(inputEl?.value, 10);
   document.querySelectorAll('#quickCheckInChipsContainer .quick-chip-btn').forEach((btn) => {
@@ -965,35 +995,52 @@ window.onQuickCheckInInputChange = function() {
   });
 };
 
-window.submitQuickCheckIn = async function(isVerified) {
+window.submitQuickCheckIn = async function(isVerified, btnEl) {
   if (!activeCheckInTask) return;
   const taskId = activeCheckInTask.taskId;
   const estMins = activeCheckInTask.estMinutes;
   const inputEl = document.getElementById('quickCheckInMinutesInput');
   const actualMinutes = isVerified ? Math.max(1, parseInt(inputEl?.value, 10) || estMins) : estMins;
 
-  const btn = isVerified ? document.querySelector('#quickCheckInModal .btn-primary-emerald') : document.querySelector('#quickCheckInModal .btn-secondary-pill');
-  return withActionLock('submitQuickCheckIn', btn, isVerified ? 'Saving...' : 'Skipping...', async () => {
-    window.closeModal('quickCheckInModal');
-    activeCheckInTask = null;
-    await window.handleHomeCompleteNextTask(taskId, actualMinutes, Boolean(isVerified));
-  });
+  const confirmBtn = document.getElementById('quickCheckInConfirmBtn');
+  const skipBtn = document.getElementById('quickCheckInSkipBtn');
+  const clickedBtn = (btnEl && btnEl.nodeType === 1) ? btnEl : (isVerified ? confirmBtn : skipBtn);
+
+  return withActionLock('submitQuickCheckIn', clickedBtn, 'Completing...', async () => {
+    const otherBtn = clickedBtn === confirmBtn ? skipBtn : confirmBtn;
+    if (otherBtn) {
+      otherBtn.disabled = true;
+      otherBtn.classList.add('btn-action-locked');
+    }
+    try {
+      const success = await window.handleHomeCompleteNextTask(taskId, actualMinutes, Boolean(isVerified));
+      if (success !== false) {
+        window.closeModal('quickCheckInModal');
+        activeCheckInTask = null;
+      }
+    } finally {
+      if (otherBtn) {
+        otherBtn.disabled = false;
+        otherBtn.classList.remove('btn-action-locked');
+      }
+    }
+  }, 'Please wait — still processing...', { disableSiblings: true });
 };
 
-window.handleTaskCheckboxClick = function(taskId, goalId) {
+window.handleTaskCheckboxClick = function(taskId, goalId, el) {
   const task = (Store.state.tasks || []).find((t) => t.id === taskId);
   if (task && (task.completed === 1 || task.completed === true)) {
     // Unchecking: directly toggle off
-    window.toggleTaskCompletion(taskId, goalId);
+    window.toggleTaskCompletion(taskId, goalId, el);
   } else {
     // Checking: open the Quick Execution Check-In modal!
     window.openQuickCheckInModal(taskId);
   }
 };
 
-window.handleHomeCompleteNextTask = async function(taskId, actualMinutes = null, durationVerified = true) {
+window.handleHomeCompleteNextTask = async function (taskId, actualMinutes = null, durationVerified = true) {
   return withActionLock('task_action_' + taskId, null, null, async () => {
-    if (isTaskActionInFlight) return;
+    if (isTaskActionInFlight) return false;
     isTaskActionInFlight = true;
     try {
       const payload = { taskId };
@@ -1016,19 +1063,23 @@ window.handleHomeCompleteNextTask = async function(taskId, actualMinutes = null,
         if (Store.state.currentView === 'insights') renderInsights(Store.state);
         if (Store.state.currentView === 'goals') renderGoals(Store.state);
         if (Store.state.currentView === 'tasks') renderTasks(Store.state);
+        return true;
       } else {
         showToast(data.error || 'Failed to complete task.', 'error');
+        return false;
       }
     } catch (err) {
       showToast('Failed to complete task.', 'error');
+      return false;
     } finally {
       isTaskActionInFlight = false;
     }
-  });
+  }, 'Please wait — still processing...');
 };
 
-window.handleHomeRescheduleNextTask = async function(taskId) {
-  return withActionLock('task_action_' + taskId, null, null, async () => {
+window.handleHomeRescheduleNextTask = async function(taskId, btnEl) {
+  const btn = (btnEl && btnEl.nodeType === 1) ? btnEl : document.querySelector(`[onclick*="handleHomeRescheduleNextTask('${taskId}')"], [onclick*="rescheduleScheduledBlock('${taskId}')"]`);
+  return withActionLock('task_action_' + taskId, btn, 'Rescheduling...', async () => {
     if (isTaskActionInFlight) return;
     isTaskActionInFlight = true;
     try {
@@ -1057,7 +1108,7 @@ window.handleHomeRescheduleNextTask = async function(taskId) {
     } finally {
       isTaskActionInFlight = false;
     }
-  });
+  }, 'Please wait — still processing...', { disableSiblings: true });
 };
 
 function renderHome(state) {
@@ -1175,7 +1226,7 @@ function renderHome(state) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
             <span>Complete</span>
           </button>
-          <button type="button" class="btn-reschedule-task" onclick="handleHomeRescheduleNextTask('${nextBlock.task_id}')">
+          <button type="button" class="btn-reschedule-task" onclick="handleHomeRescheduleNextTask('${nextBlock.task_id}', this)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
             <span>Reschedule</span>
           </button>
@@ -1223,7 +1274,7 @@ function renderHome(state) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
             <span>Complete</span>
           </button>
-          <button type="button" class="btn-reschedule-task" onclick="handleHomeRescheduleNextTask('${firstIncomp.id}')">
+          <button type="button" class="btn-reschedule-task" onclick="handleHomeRescheduleNextTask('${firstIncomp.id}', this)">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
             <span>Reschedule</span>
           </button>
@@ -1307,7 +1358,7 @@ function renderHome(state) {
           <div style="font-size: 1.4rem; margin-bottom: 6px;">⚡</div>
           <div class="schedule-starter-title" style="font-size: 0.95rem; font-weight: 700;">Ready to Schedule</div>
           <p class="schedule-starter-body" style="font-size: 0.82rem; margin: 4px 0 12px 0; color: var(--text-secondary);">${subtitleText}</p>
-          <button type="button" class="btn-primary-emerald" style="padding: 6px 14px; font-size: 0.8rem; margin: 0 auto;" onclick="triggerAutoSchedule()">⚡ Auto-Schedule Today</button>
+          <button type="button" class="btn-primary-emerald" style="padding: 6px 14px; font-size: 0.8rem; margin: 0 auto;" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule Today</button>
         </div>
       `;
     } else {
@@ -1687,7 +1738,7 @@ function renderGoals(state) {
           ` : goalTasks.map((task) => `
             <div class="goal-task-item ${task.completed ? 'completed' : ''}" id="task-item-${task.id}">
               <div class="goal-task-left">
-                <div class="goal-task-checkbox ${task.completed ? 'checked' : ''}" onclick="handleTaskCheckboxClick('${task.id}', '${goal.id}')">
+                <div class="goal-task-checkbox ${task.completed ? 'checked' : ''}" onclick="handleTaskCheckboxClick('${task.id}', '${goal.id}', this)">
                   <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg>
                 </div>
                 <div class="goal-task-details">
@@ -1717,18 +1768,18 @@ function renderGoals(state) {
   }).join('');
 }
 
-window.setGoalFilter = function(filterVal) {
+window.setGoalFilter = function (filterVal) {
   document.querySelectorAll('.goals-filter-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-filter') === filterVal);
   });
   Store.setState({ goalFilter: filterVal });
 };
 
-window.handleGoalSearch = function(e) {
+window.handleGoalSearch = function (e) {
   Store.setState({ goalSearch: e.target.value });
 };
 
-window.clearGoalFilters = function() {
+window.clearGoalFilters = function () {
   const searchInput = document.getElementById('goalSearchInput') || document.querySelector('.search-field');
   if (searchInput) searchInput.value = '';
   document.querySelectorAll('.goals-filter-btn').forEach((btn) => {
@@ -1737,7 +1788,7 @@ window.clearGoalFilters = function() {
   Store.setState({ goalFilter: 'All', goalSearch: '' });
 };
 
-window.openAddGoalModal = function() {
+window.openAddGoalModal = function () {
   const form = document.getElementById('addGoalForm');
   if (form) form.reset();
   const btn = document.getElementById('addGoalSubmitBtn');
@@ -1751,7 +1802,7 @@ window.openAddGoalModal = function() {
   window.openModal('addGoalModal');
 };
 
-window.openEditGoalModal = function(goalId) {
+window.openEditGoalModal = function (goalId) {
   const goal = Store.state.goals.find((g) => g.id === goalId);
   if (!goal) return;
 
@@ -1795,7 +1846,7 @@ window.openEditGoalModal = function(goalId) {
   window.openModal('editGoalModal');
 };
 
-window.openDeleteGoalModal = function(goalId) {
+window.openDeleteGoalModal = function (goalId) {
   const goal = Store.state.goals.find((g) => g.id === goalId);
   if (!goal) return;
 
@@ -1818,7 +1869,7 @@ window.openDeleteGoalModal = function(goalId) {
   window.openModal('deleteGoalModal');
 };
 
-window.deleteGoal = function(goalId) {
+window.deleteGoal = function (goalId) {
   window.openDeleteGoalModal(goalId);
 };
 
@@ -1905,7 +1956,7 @@ function renderTasks(state) {
     return `
       <div class="task-row-item ${task.completed ? 'completed' : ''}">
         <div class="task-row-left">
-          <div class="task-checkbox-custom ${task.completed ? 'checked' : ''}" onclick="handleTaskCheckboxClick('${task.id}', '${task.goal_id || ''}')" title="${task.completed ? 'Mark incomplete' : 'Complete (Quick Check-In)'}">
+          <div class="task-checkbox-custom ${task.completed ? 'checked' : ''}" onclick="handleTaskCheckboxClick('${task.id}', '${task.goal_id || ''}', this)" title="${task.completed ? 'Mark incomplete' : 'Complete (Quick Check-In)'}">
             <svg viewBox="0 0 24 24" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg>
           </div>
           <div style="display: flex; flex-direction: column;">
@@ -1939,29 +1990,29 @@ function renderTasks(state) {
   }).join('');
 }
 
-window.setTaskTypeFilter = function(filter) {
+window.setTaskTypeFilter = function (filter) {
   document.querySelectorAll('.task-type-pill').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-type') === filter);
   });
   Store.setState({ taskTypeFilter: filter });
 };
 
-window.setTaskTab = function(tabName) {
+window.setTaskTab = function (tabName) {
   document.querySelectorAll('.task-tab-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
   });
   Store.setState({ taskTab: tabName });
 };
 
-window.handleTaskSearch = function(e) {
+window.handleTaskSearch = function (e) {
   Store.setState({ taskSearch: e.target.value });
 };
 
-window.rescheduleTask = function(taskId) {
-  window.handleHomeRescheduleNextTask(taskId);
+window.rescheduleTask = function(taskId, btnEl) {
+  window.handleHomeRescheduleNextTask(taskId, btnEl);
 };
 
-window.deleteTask = function(taskId) {
+window.deleteTask = function (taskId) {
   window.openDeleteTaskModal(taskId);
 };
 
@@ -2183,7 +2234,7 @@ async function renderSchedule(state) {
               <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">Unscheduled Queue</span>
               <span class="category-pill" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; font-size: 0.72rem;">${unscheduledTasks.length} pending</span>
             </div>
-            <button type="button" class="btn-primary-emerald" style="padding: 4px 12px; font-size: 0.76rem;" onclick="triggerAutoSchedule()">⚡ Auto-Schedule</button>
+            <button type="button" class="btn-primary-emerald" style="padding: 4px 12px; font-size: 0.76rem;" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule</button>
           </div>
           <div class="unscheduled-queue-list">
             ${unscheduledTasks.map((t) => `
@@ -2195,7 +2246,7 @@ async function renderSchedule(state) {
                   <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.66rem;">${escapeHtml(t.priority || 'Medium')}</span>
                 </div>
                 <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-                  <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px;" onclick="triggerAutoSchedule()">⚡ Schedule</button>
+                  <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px;" onclick="triggerAutoSchedule(this)">⚡ Schedule</button>
                   <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px; color: var(--brand-emerald);" onclick="openQuickCheckInModal('${t.id}')">✓ Complete</button>
                 </div>
               </div>
@@ -2211,7 +2262,7 @@ async function renderSchedule(state) {
         <p class="schedule-starter-body">Complete your 24-hour routine (Fixed Commitments + Flexible Windows) to auto-schedule your goals into protected focus hours.</p>
         <div class="schedule-action-pair">
           <button class="btn-secondary-pill" onclick="openInitialRoutineModal(true)">Set Up Routine</button>
-          <button class="btn-primary-emerald" onclick="triggerAutoSchedule()">⚡ Auto-Schedule Goals</button>
+          <button class="btn-primary-emerald" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule Goals</button>
         </div>
       </div>
       ${queueHtml}
@@ -2316,8 +2367,8 @@ async function renderSchedule(state) {
           ${isMissed ? '<span style="font-size: 0.78rem; color: #ef4444; font-weight: 700; padding: 4px 8px; background: rgba(239, 68, 68, 0.1); border-radius: 6px;">✕ Missed</span>' : ''}
           ${!isCompleted && !isMissed ? `
             <button type="button" class="btn-secondary-pill" style="font-size: 0.74rem; padding: 5px 12px; color: var(--brand-emerald); font-weight: 600;" onclick="openQuickCheckInModal('${item.taskId}')">✓ Complete</button>
-            <button type="button" class="btn-secondary-pill" style="font-size: 0.74rem; padding: 5px 12px; color: #f59e0b; font-weight: 600;" onclick="rescheduleScheduledBlock('${item.taskId}')">↻ Reschedule</button>
-            <button type="button" class="btn-secondary-pill" style="font-size: 0.74rem; padding: 5px 12px; color: #ef4444; font-weight: 600;" onclick="missScheduledBlock('${item.taskId}')">✕ Miss</button>
+            <button type="button" class="btn-secondary-pill" style="font-size: 0.74rem; padding: 5px 12px; color: #f59e0b; font-weight: 600;" onclick="rescheduleScheduledBlock('${item.taskId}', this)">↻ Reschedule</button>
+            <button type="button" class="btn-secondary-pill" style="font-size: 0.74rem; padding: 5px 12px; color: #ef4444; font-weight: 600;" onclick="missScheduledBlock('${item.taskId}', this)">✕ Miss</button>
           ` : ''}
         </div>
       </div>
@@ -2337,7 +2388,7 @@ async function renderSchedule(state) {
             <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">Unscheduled Queue</span>
             <span class="category-pill" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; font-size: 0.72rem;">${unscheduledTasks.length} pending</span>
           </div>
-          <button type="button" class="btn-primary-emerald" style="padding: 4px 12px; font-size: 0.76rem;" onclick="triggerAutoSchedule()">⚡ Auto-Schedule</button>
+          <button type="button" class="btn-primary-emerald" style="padding: 4px 12px; font-size: 0.76rem;" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule</button>
         </div>
         <div class="unscheduled-queue-list">
           ${unscheduledTasks.map((t) => `
@@ -2346,12 +2397,12 @@ async function renderSchedule(state) {
                 <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(t.title)}</span>
                 <span style="font-size: 0.72rem; color: var(--text-muted);">⏱️ ${t.duration_minutes || 30}m</span>
                 ${Boolean(t.goal_id || t.goalId)
-                  ? `<span class="category-pill pill-goal" style="font-size: 0.7rem;">🎯 ${escapeHtml(t.goal_title || 'Goal Task')}</span>`
-                  : `<span class="category-pill pill-independent" style="font-size: 0.7rem;">📌 Independent</span>`}
+        ? `<span class="category-pill pill-goal" style="font-size: 0.7rem;">🎯 ${escapeHtml(t.goal_title || 'Goal Task')}</span>`
+        : `<span class="category-pill pill-independent" style="font-size: 0.7rem;">📌 Independent</span>`}
                 <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.66rem;">${escapeHtml(t.priority || 'Medium')}</span>
               </div>
               <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-                <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px;" onclick="triggerAutoSchedule()">⚡ Schedule</button>
+                <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px;" onclick="triggerAutoSchedule(this)">⚡ Schedule</button>
                 <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px; color: var(--brand-emerald);" onclick="openQuickCheckInModal('${t.id}')">✓ Complete</button>
               </div>
             </div>
@@ -2364,9 +2415,9 @@ async function renderSchedule(state) {
   streamContainer.innerHTML = timelineHtml + unscheduledQueueHtml;
 }
 
-window.triggerAutoSchedule = async function() {
+window.triggerAutoSchedule = async function(btnEl) {
   if (Store.state.routine_coverage_incomplete) {
-    const msg = Store.state.routine_warning_message || 
+    const msg = Store.state.routine_warning_message ||
       (Store.state.routine_coverage_status && Store.state.routine_coverage_status.message) ||
       'Without your full 24-hour schedule, EKAGRA cannot know when you are free vs. busy to schedule your goals.';
     showToast(msg, 'warning');
@@ -2376,7 +2427,9 @@ window.triggerAutoSchedule = async function() {
     return;
   }
 
-  const activeBtn = document.getElementById('homeAutoScheduleBtn') || document.querySelector('[onclick="triggerAutoSchedule()"]');
+  const activeBtn = (btnEl && btnEl.nodeType === 1)
+    ? btnEl
+    : (document.getElementById('homeAutoScheduleBtn') || document.getElementById('btnAutoScheduleGoals') || document.querySelector('[onclick*="triggerAutoSchedule"]'));
   return withActionLock('triggerAutoSchedule', activeBtn, 'Scheduling...', async () => {
     if (isTaskActionInFlight) return;
     isTaskActionInFlight = true;
@@ -2422,10 +2475,10 @@ window.triggerAutoSchedule = async function() {
     } finally {
       isTaskActionInFlight = false;
     }
-  });
+  }, 'Please wait — still processing...');
 };
 
-window.completeScheduledBlock = async function(taskId) {
+window.completeScheduledBlock = async function (taskId) {
   if (typeof window.openQuickCheckInModal === 'function') {
     window.openQuickCheckInModal(taskId);
   } else {
@@ -2433,38 +2486,43 @@ window.completeScheduledBlock = async function(taskId) {
   }
 };
 
-window.missScheduledBlock = async function(taskId) {
-  if (isTaskActionInFlight) return;
-  isTaskActionInFlight = true;
-  try {
-    const res = await fetch('/api/schedule/miss-task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId })
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      showToast('Task marked missed. Adaptive focus model updated.', 'info');
-      await Store.loadTodaySchedule();
-      await Store.init();
-      renderSchedule(Store.state);
-      renderHome(Store.state);
-      if (Store.state.currentView === 'insights') renderInsights(Store.state);
-    } else {
-      showToast(data.error || 'Failed to record missed task.', 'error');
+window.missScheduledBlock = async function(taskId, btnEl) {
+  const btn = (btnEl && btnEl.nodeType === 1) ? btnEl : document.querySelector(`[onclick*="missScheduledBlock('${taskId}')"]`);
+  return withActionLock('task_action_' + taskId, btn, 'Updating...', async () => {
+    if (isTaskActionInFlight) return;
+    isTaskActionInFlight = true;
+    try {
+      const res = await fetch('/api/schedule/miss-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Task marked missed. Adaptive focus model updated.', 'info');
+        await Store.loadTodaySchedule();
+        await Store.init();
+        renderSchedule(Store.state);
+        renderHome(Store.state);
+        if (Store.state.currentView === 'insights') renderInsights(Store.state);
+        if (Store.state.currentView === 'goals') renderGoals(Store.state);
+        if (Store.state.currentView === 'tasks') renderTasks(Store.state);
+      } else {
+        showToast(data.error || 'Failed to record missed task.', 'error');
+      }
+    } catch (e) {
+      showToast('Failed to record missed task.', 'error');
+    } finally {
+      isTaskActionInFlight = false;
     }
-  } catch (e) {
-    showToast('Failed to record missed task.', 'error');
-  } finally {
-    isTaskActionInFlight = false;
-  }
+  }, 'Please wait — still processing...', { disableSiblings: true });
 };
 
-window.rescheduleScheduledBlock = async function(taskId) {
-  await window.handleHomeRescheduleNextTask(taskId);
+window.rescheduleScheduledBlock = async function(taskId, btnEl) {
+  await window.handleHomeRescheduleNextTask(taskId, btnEl);
 };
 
-window.navigateScheduleDay = function(delta) {
+window.navigateScheduleDay = function (delta) {
   scheduleFetchId++;
   const mode = Store.state.scheduleViewMode || 'Day';
   const current = parseLocalDate(Store.state.scheduleDate || new Date());
@@ -2478,12 +2536,12 @@ window.navigateScheduleDay = function(delta) {
   Store.setState({ scheduleDate: current });
 };
 
-window.snapScheduleToday = function() {
+window.snapScheduleToday = function () {
   scheduleFetchId++;
   Store.setState({ scheduleDate: new Date() });
 };
 
-window.setScheduleViewMode = function(mode) {
+window.setScheduleViewMode = function (mode) {
   scheduleFetchId++;
   document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
@@ -2491,7 +2549,7 @@ window.setScheduleViewMode = function(mode) {
   Store.setState({ scheduleViewMode: mode });
 };
 
-window.selectScheduleDateAndMode = function(dateIsoString, mode = 'Day') {
+window.selectScheduleDateAndMode = function (dateIsoString, mode = 'Day') {
   scheduleFetchId++;
   const d = parseLocalDate(dateIsoString);
   document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
@@ -2836,10 +2894,10 @@ function renderRoutines(state) {
         </div>
       </div>
       <div>
-        ${coverage.is_full_day_covered 
-          ? `<span class="routine-coverage-badge complete">✓ 24-Hour Day Fully Covered</span>`
-          : `<span class="routine-coverage-badge incomplete">⚠️ Incomplete: ${uncoveredHours} hrs unclassified</span>`
-        }
+        ${coverage.is_full_day_covered
+      ? `<span class="routine-coverage-badge complete">✓ 24-Hour Day Fully Covered</span>`
+      : `<span class="routine-coverage-badge incomplete">⚠️ Incomplete: ${uncoveredHours} hrs unclassified</span>`
+    }
       </div>
     </div>
 
@@ -2856,15 +2914,15 @@ function renderRoutines(state) {
     <!-- Vertical Timeline -->
     <div class="routine-timeline-wrapper">
       ${timelineItems.map((item) => {
-        if (item.type === 'commitment') {
-          const r = item.routine;
-          const typeClass = (r.type || 'Fixed').toLowerCase();
-          const isFlex = typeClass === 'flexible';
-          const isAvail = (r.availability_type === 'available');
-          const iconHtml = getRoutineCategoryIcon(r.name);
-          const durationStr = formatDurationHoursMinutes(item.duration_minutes);
+      if (item.type === 'commitment') {
+        const r = item.routine;
+        const typeClass = (r.type || 'Fixed').toLowerCase();
+        const isFlex = typeClass === 'flexible';
+        const isAvail = (r.availability_type === 'available');
+        const iconHtml = getRoutineCategoryIcon(r.name);
+        const durationStr = formatDurationHoursMinutes(item.duration_minutes);
 
-          return `
+        return `
             <div class="routine-timeline-item" id="routine-timeline-${r.id}">
               <div class="routine-timeline-time-col">
                 <div class="routine-timeline-time-text">${formatTime12Hour(r.start_time)} – ${formatTime12Hour(r.end_time)}</div>
@@ -2908,11 +2966,11 @@ function renderRoutines(state) {
               </div>
             </div>
           `;
-        } else if (item.type === 'gap') {
-          const gap = item.gap;
-          const durationStr = formatDurationHoursMinutes(gap.duration_minutes);
+      } else if (item.type === 'gap') {
+        const gap = item.gap;
+        const durationStr = formatDurationHoursMinutes(gap.duration_minutes);
 
-          return `
+        return `
             <div class="routine-timeline-item">
               <div class="routine-timeline-time-col">
                 <div class="routine-timeline-time-text" style="color: var(--text-muted);">${formatTime12Hour(gap.start_time)} – ${formatTime12Hour(gap.end_time)}</div>
@@ -2938,8 +2996,8 @@ function renderRoutines(state) {
               </div>
             </div>
           `;
-        }
-      }).join('')}
+      }
+    }).join('')}
     </div>
   `;
 }
@@ -3293,7 +3351,7 @@ function renderSettings(state) {
   if (weeklyToggle) weeklyToggle.checked = Boolean(prefs.notify_weekly);
 }
 
-window.handleNotificationSettingChange = async function(settingKey, isChecked) {
+window.handleNotificationSettingChange = async function (settingKey, isChecked) {
   const currentPrefs = Store.state.user_preferences || { notify_tasks: true, notify_goals: true, notify_weekly: true };
   const updatedPrefs = { ...currentPrefs, [settingKey]: isChecked };
   Store.state.user_preferences = updatedPrefs;
@@ -3317,7 +3375,7 @@ window.handleNotificationSettingChange = async function(settingKey, isChecked) {
   }
 };
 
-window.handleSettingsChangePassword = async function() {
+window.handleSettingsChangePassword = async function () {
   const email = Store.state?.user?.email;
   if (!email) {
     showToast('Unable to determine account email.', 'error');
@@ -3347,7 +3405,7 @@ window.handleSettingsChangePassword = async function() {
   }
 };
 
-window.handleEmailNotificationsClick = function() {
+window.handleEmailNotificationsClick = function () {
   const notifSection = document.getElementById('settingsNotificationsTitle');
   if (notifSection) {
     notifSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3420,7 +3478,7 @@ function initModals() {
   });
 
   // Goal Form Submission (Add Goal - Zero Category)
-  window.handleAddGoalFormSubmit = async function(e) {
+  window.handleAddGoalFormSubmit = async function (e) {
     if (e && e.preventDefault) e.preventDefault();
     const submitBtn = document.getElementById('addGoalSubmitBtn');
     return withActionLock('addGoal', submitBtn, 'Creating...', async () => {
@@ -3509,7 +3567,7 @@ function initModals() {
   }
 
   // Goal Form Submission (Edit Goal - Zero Category)
-  window.handleEditGoalFormSubmit = async function(e) {
+  window.handleEditGoalFormSubmit = async function (e) {
     if (e && e.preventDefault) e.preventDefault();
     const submitBtn = document.getElementById('editGoalSubmitBtn');
     return withActionLock('editGoal', submitBtn, 'Saving...', async () => {
@@ -3741,7 +3799,7 @@ function initModals() {
   });
 }
 
-window.openModal = function(modalId) {
+window.openModal = function (modalId) {
   const el = document.getElementById(modalId);
   if (el) el.classList.add('open');
   if (typeof window.updateGlobalRoutineBanner === 'function') {
@@ -3749,7 +3807,7 @@ window.openModal = function(modalId) {
   }
 };
 
-window.openAddTaskModal = function(preselectedGoalId = null) {
+window.openAddTaskModal = function (preselectedGoalId = null) {
   const modal = document.getElementById('addTaskModal');
   if (!modal) return;
 
@@ -3805,7 +3863,7 @@ window.openAddTaskModal = function(preselectedGoalId = null) {
   }, 100);
 };
 
-window.handleAddTaskFormSubmit = async function(e) {
+window.handleAddTaskFormSubmit = async function (e) {
   if (e) e.preventDefault();
   const titleInput = document.getElementById('newTaskTitle');
   const title = (titleInput?.value || '').trim();
@@ -4139,7 +4197,7 @@ function renderInitialDaysRows() {
   validateInitialDays();
 }
 
-window.toggleInitialDay = function(day, targetGroup) {
+window.toggleInitialDay = function (day, targetGroup) {
   if (targetGroup === 'weekdays') {
     if (!initialSetupDays.weekdays_days.includes(day)) {
       initialSetupDays.weekdays_days.push(day);
@@ -4187,7 +4245,7 @@ function updateModalCoverageIndicators() {
   if (remEl) remEl.textContent = activeCov.is_full_day_covered ? '✓ 100% Covered' : `${Math.floor(activeUncov / 60)}h ${String(activeUncov % 60).padStart(2, '0')}m unallocated`;
 }
 
-window.switchModalRoutineGroup = function(group) {
+window.switchModalRoutineGroup = function (group) {
   initialModalActiveGroup = group;
   document.getElementById('modalTabWeekdays')?.classList.toggle('active', group === 'weekdays');
   document.getElementById('modalTabWeekends')?.classList.toggle('active', group === 'weekends');
@@ -4218,7 +4276,7 @@ function renderInitialBlocksList() {
   }
 
   container.innerHTML = groupBlocks.map((b) => {
-    const groupBadge = b.schedule_group === 'weekdays' 
+    const groupBadge = b.schedule_group === 'weekdays'
       ? `<span style="background: rgba(16, 185, 129, 0.15); color: var(--brand-emerald); padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">Weekdays</span>`
       : `<span style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">Weekends</span>`;
 
@@ -4238,7 +4296,7 @@ function renderInitialBlocksList() {
   updateModalCoverageIndicators();
 }
 
-window.addInitialPresetBlock = function(name, startTime, endTime, group, type) {
+window.addInitialPresetBlock = function (name, startTime, endTime, group, type) {
   const errEl = document.getElementById('initialSetupErrorAlert');
   const msgEl = document.getElementById('initialSetupErrorMsg');
   const targetGroup = group || initialModalActiveGroup;
@@ -4275,7 +4333,7 @@ window.addInitialPresetBlock = function(name, startTime, endTime, group, type) {
   renderInitialBlocksList();
 };
 
-window.addInitialCustomBlock = function() {
+window.addInitialCustomBlock = function () {
   const nameEl = document.getElementById('initialInputName');
   const groupEl = document.getElementById('initialInputGroup');
   const typeEl = document.getElementById('initialInputType');
@@ -4342,7 +4400,7 @@ window.addInitialCustomBlock = function() {
   renderInitialBlocksList();
 };
 
-window.removeInitialBlock = function(id) {
+window.removeInitialBlock = function (id) {
   initialSetupBlocks = initialSetupBlocks.filter((b) => b.id !== id);
   renderInitialBlocksList();
 };
@@ -4350,7 +4408,7 @@ window.removeInitialBlock = function(id) {
 let initialSetupGaps = [];
 let initialSetupClassifiedGaps = {};
 
-window.openInitialRoutineModal = function(forceOpen = false) {
+window.openInitialRoutineModal = function (forceOpen = false) {
   const settings = Store.state.scheduleSettings || {
     weekdays_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     weekends_days: ['Saturday', 'Sunday'],
@@ -4465,7 +4523,7 @@ function renderInitialGapsReview(gaps) {
   }).join('');
 }
 
-window.selectInitialGapClassification = function(idx, activityName, type, availType) {
+window.selectInitialGapClassification = function (idx, activityName, type, availType) {
   const gap = initialSetupGaps[idx];
   if (!gap) return;
 
@@ -4490,7 +4548,7 @@ window.selectInitialGapClassification = function(idx, activityName, type, availT
   renderInitialGapsReview(initialSetupGaps);
 };
 
-window.updateInitialGapCustomName = function(idx) {
+window.updateInitialGapCustomName = function (idx) {
   const gap = initialSetupGaps[idx];
   if (!gap) return;
   const nameInput = document.getElementById(`initialGapName_${idx}`);
@@ -4518,14 +4576,14 @@ window.updateInitialGapCustomName = function(idx) {
   };
 };
 
-window.updateInitialGapFlexibility = function(idx) {
+window.updateInitialGapFlexibility = function (idx) {
   const flexBox = document.getElementById(`initialGapFlex_${idx}`);
   if (initialSetupClassifiedGaps[idx] && flexBox) {
     initialSetupClassifiedGaps[idx].type = flexBox.checked ? 'Flexible' : 'Fixed';
   }
 };
 
-window.skipInitialRoutineSetup = function() {
+window.skipInitialRoutineSetup = function () {
   window.closeModal('initialRoutineModal');
   // Temporary dismissal for the current session; does NOT mark routine complete
   sessionStorage.setItem('ekagra_routine_dismissed_session', 'true');
@@ -4538,7 +4596,7 @@ window.skipInitialRoutineSetup = function() {
   window.showFirstTaskNotification();
 };
 
-window.openInitialGapsStep = function() {
+window.openInitialGapsStep = function () {
   if (!validateInitialDays()) return;
   const curGroup = (typeof initialModalActiveGroup !== 'undefined' ? initialModalActiveGroup : 'weekdays');
   const groupBlocks = initialSetupBlocks.filter((b) => (b.schedule_group || 'weekdays') === curGroup);
@@ -4561,7 +4619,7 @@ window.openInitialGapsStep = function() {
   renderInitialGapsReview(coverage.gaps);
 };
 
-window.backToInitialStep1 = function() {
+window.backToInitialStep1 = function () {
   const step1 = document.getElementById('initialSetupStep1');
   const step2 = document.getElementById('initialSetupStep2');
   const footer1 = document.getElementById('initialSetupFooterStep1');
@@ -4577,7 +4635,7 @@ window.backToInitialStep1 = function() {
   if (subEl) subEl.textContent = "Tell EKAGRA when you're busy so we can understand when you are available for your tasks.";
 };
 
-window.saveInitialRoutineSetup = async function() {
+window.saveInitialRoutineSetup = async function () {
   const errEl = document.getElementById('initialSetupErrorAlert');
   const msgEl = document.getElementById('initialSetupErrorMsg');
 
@@ -4588,11 +4646,11 @@ window.saveInitialRoutineSetup = async function() {
   await executeSaveInitialSetup(true);
 };
 
-window.saveInitialRoutineProgress = async function() {
+window.saveInitialRoutineProgress = async function () {
   await executeSaveInitialSetup(false);
 };
 
-window.finishInitialRoutineSetup = async function() {
+window.finishInitialRoutineSetup = async function () {
   await executeSaveInitialSetup(true);
 };
 
@@ -4670,7 +4728,7 @@ async function executeSaveInitialSetup(isCompleting) {
 }
 
 // Gap Classification Modal Functions for Routines Section
-window.openClassifyGapModal = function(startTime, endTime, group) {
+window.openClassifyGapModal = function (startTime, endTime, group) {
   const startEl = document.getElementById('classifyGapStart');
   const endEl = document.getElementById('classifyGapEnd');
   const groupEl = document.getElementById('classifyGapGroup');
@@ -4692,7 +4750,7 @@ window.openClassifyGapModal = function(startTime, endTime, group) {
   window.openModal('classifyGapModal');
 };
 
-window.openFirstUnclassifiedGap = function(group) {
+window.openFirstUnclassifiedGap = function (group) {
   const currentGroup = group || Store.state.activeRoutineGroup || 'weekdays';
   const routines = (Store.state.routines || []).filter((r) => (r.schedule_group || 'weekdays') === currentGroup);
   const coverage = calculateClientDayGaps(routines);
@@ -4704,7 +4762,7 @@ window.openFirstUnclassifiedGap = function(group) {
   }
 };
 
-window.selectGapPreset = function(activityName, type, availType) {
+window.selectGapPreset = function (activityName, type, availType) {
   const nameEl = document.getElementById('classifyGapName');
   const availEl = document.getElementById('classifyGapAvailType');
   if (nameEl) nameEl.value = activityName;
@@ -4712,14 +4770,14 @@ window.selectGapPreset = function(activityName, type, availType) {
   window.setClassifyGapType(type);
 };
 
-window.setClassifyGapType = function(type) {
+window.setClassifyGapType = function (type) {
   const fixedBtn = document.getElementById('classifyTypeFixedBtn');
   const flexBtn = document.getElementById('classifyTypeFlexBtn');
   if (fixedBtn) fixedBtn.classList.toggle('selected', type === 'Fixed');
   if (flexBtn) flexBtn.classList.toggle('selected', type === 'Flexible');
 };
 
-window.handleClassifyGapSubmit = async function(e) {
+window.handleClassifyGapSubmit = async function (e) {
   if (e && e.preventDefault) e.preventDefault();
   const startTime = document.getElementById('classifyGapStart')?.value;
   const endTime = document.getElementById('classifyGapEnd')?.value;
@@ -4771,13 +4829,13 @@ window.handleClassifyGapSubmit = async function(e) {
   });
 };
 
-window.openAddRoutineModalForGroup = function(group, event) {
+window.openAddRoutineModalForGroup = function (group, event) {
   if (event) event.stopPropagation();
   window.closeModal('initialRoutineModal');
   window.openAddRoutineModal(group);
 };
 
-window.checkAndDisplayFirstTaskPrompt = function(state) {
+window.checkAndDisplayFirstTaskPrompt = function (state) {
   const banner = document.getElementById('firstTaskBanner');
   if (!banner) return;
 
@@ -4808,12 +4866,12 @@ window.checkAndDisplayFirstTaskPrompt = function(state) {
   banner.style.display = 'flex';
 };
 
-window.showFirstTaskNotification = function() {
+window.showFirstTaskNotification = function () {
   switchView('goals');
   window.checkAndDisplayFirstTaskPrompt(Store.state);
 };
 
-window.handleBannerAddFirstTask = function() {
+window.handleBannerAddFirstTask = function () {
   const banner = document.getElementById('firstTaskBanner');
   if (banner) banner.style.display = 'none';
 
@@ -4836,7 +4894,7 @@ window.handleBannerAddFirstTask = function() {
   }
 };
 
-window.dismissFirstTaskBanner = function() {
+window.dismissFirstTaskBanner = function () {
   const goalId = Store.state.lastCreatedGoalId || (Store.state.goals?.length === 1 ? Store.state.goals[0].id : null);
   if (goalId) {
     localStorage.setItem(`ekagra_first_task_dismissed_${goalId}`, 'true');
@@ -4845,7 +4903,7 @@ window.dismissFirstTaskBanner = function() {
   if (banner) banner.style.display = 'none';
 };
 
-window.switchRoutineActiveGroup = function(group) {
+window.switchRoutineActiveGroup = function (group) {
   const btnWeekdays = document.getElementById('btnGroupWeekdays');
   const btnWeekends = document.getElementById('btnGroupWeekends');
   if (btnWeekdays) btnWeekdays.classList.toggle('active', group === 'weekdays');
@@ -4857,7 +4915,7 @@ window.switchRoutineActiveGroup = function(group) {
   Store.setState({ activeRoutineGroup: group });
 };
 
-window.openCustomizeDaysModal = function() {
+window.openCustomizeDaysModal = function () {
   const settings = Store.state.scheduleSettings || {
     weekdays_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
     weekends_days: ['Saturday', 'Sunday']
@@ -4907,7 +4965,7 @@ function renderCustomizeDaysModalContent() {
   }).join('');
 }
 
-window.toggleDayAssignment = function(day, targetGroup) {
+window.toggleDayAssignment = function (day, targetGroup) {
   const editing = Store.state.editingDayAssignments;
   if (!editing) return;
 
@@ -4935,7 +4993,7 @@ window.toggleDayAssignment = function(day, targetGroup) {
   renderCustomizeDaysModalContent();
 };
 
-window.saveDayAssignmentsSubmit = async function() {
+window.saveDayAssignmentsSubmit = async function () {
   const editing = Store.state.editingDayAssignments;
   if (!editing) return;
 
@@ -4976,7 +5034,7 @@ window.saveDayAssignmentsSubmit = async function() {
   });
 };
 
-window.setRoutineFormGroup = function(group) {
+window.setRoutineFormGroup = function (group) {
   document.querySelectorAll('#routineGroupSelector .routine-group-select-btn').forEach((b) => {
     b.classList.toggle('selected', b.getAttribute('data-group') === group);
   });
@@ -4989,9 +5047,9 @@ window.setRoutineFormGroup = function(group) {
   window.setRoutineDaysForGroup(group);
 };
 
-window.setRoutineDaysForGroup = function(group) {
+window.setRoutineDaysForGroup = function (group) {
   const settings = Store.state.scheduleSettings;
-  const assigned = group === 'weekdays' 
+  const assigned = group === 'weekdays'
     ? (settings?.weekdays_days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])
     : (settings?.weekends_days || ['Saturday', 'Sunday']);
   const abbrs = assigned.map((d) => d.slice(0, 3).toLowerCase());
@@ -5002,7 +5060,7 @@ window.setRoutineDaysForGroup = function(group) {
   });
 };
 
-window.openAddRoutineModal = function(preselectedGroup) {
+window.openAddRoutineModal = function (preselectedGroup) {
   const form = document.getElementById('routineForm');
   if (form && typeof form.reset === 'function') form.reset();
   const idEl = document.getElementById('routineModalEditId');
@@ -5033,7 +5091,7 @@ window.openAddRoutineModal = function(preselectedGroup) {
   window.openModal('addRoutineModal');
 };
 
-window.openEditRoutineModal = function(routineId) {
+window.openEditRoutineModal = function (routineId) {
   const routine = (Store.state.routines || []).find((r) => r.id === routineId);
   if (!routine) return;
 
@@ -5070,7 +5128,7 @@ window.openEditRoutineModal = function(routineId) {
   window.openModal('addRoutineModal');
 };
 
-window.handleRoutineFormSubmit = async function(event) {
+window.handleRoutineFormSubmit = async function (event) {
   event.preventDefault();
   const id = document.getElementById('routineModalEditId')?.value;
   const name = (document.getElementById('routineInputName')?.value || '').trim();
@@ -5092,7 +5150,7 @@ window.handleRoutineFormSubmit = async function(event) {
   }
 
   const selectedGroup = document.querySelector('#routineGroupSelector .routine-group-select-btn.selected')?.getAttribute('data-group') || Store.state.activeRoutineGroup || 'weekdays';
-  
+
   // Use group's assigned days as default if pills not individually customized
   const settings = Store.state.scheduleSettings;
   const groupDays = selectedGroup === 'weekdays' ? (settings?.weekdays_days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) : (settings?.weekends_days || ['Saturday', 'Sunday']);
@@ -5114,11 +5172,11 @@ window.handleRoutineFormSubmit = async function(event) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name, 
-          start_time, 
-          end_time, 
-          days: selectedDays, 
+        body: JSON.stringify({
+          name,
+          start_time,
+          end_time,
+          days: selectedDays,
           type,
           schedule_group: selectedGroup,
           activity_classification
@@ -5147,9 +5205,9 @@ window.handleRoutineFormSubmit = async function(event) {
         }
       }
 
-      Store.setState({ 
+      Store.setState({
         routines: updatedRoutines,
-        activeRoutineGroup: selectedGroup 
+        activeRoutineGroup: selectedGroup
       });
       window.closeModal('addRoutineModal');
       renderRoutines(Store.state);
@@ -5160,7 +5218,7 @@ window.handleRoutineFormSubmit = async function(event) {
   });
 };
 
-window.openDeleteRoutineModal = function(routineId) {
+window.openDeleteRoutineModal = function (routineId) {
   const routine = (Store.state.routines || []).find((r) => r.id === routineId);
   if (!routine) return;
 
@@ -5173,7 +5231,7 @@ window.openDeleteRoutineModal = function(routineId) {
   window.openModal('deleteRoutineModal');
 };
 
-window.setRoutineDaysPreset = function(preset) {
+window.setRoutineDaysPreset = function (preset) {
   const pills = document.querySelectorAll('#routineDaysPills .day-pill-opt');
   pills.forEach((p) => {
     const day = p.getAttribute('data-day');
@@ -5187,7 +5245,7 @@ window.setRoutineDaysPreset = function(preset) {
   });
 };
 
-window.updateRoutineOvernightIndicator = function() {
+window.updateRoutineOvernightIndicator = function () {
   const start12 = getTimePickerValue('routineStart');
   const end12 = getTimePickerValue('routineEnd');
   const hintEl = document.getElementById('routineOvernightHint');
@@ -5202,7 +5260,7 @@ window.updateRoutineOvernightIndicator = function() {
   }
 };
 
-window.toggleGoalExpand = function(goalId) {
+window.toggleGoalExpand = function (goalId) {
   if (!Store.state.expandedGoals) Store.state.expandedGoals = new Set();
   const isNowExpanded = !Store.state.expandedGoals.has(goalId);
   if (isNowExpanded) {
@@ -5230,7 +5288,7 @@ window.toggleGoalExpand = function(goalId) {
 };
 window.toggleGoalTasks = window.toggleGoalExpand;
 
-window.handleInlineTaskCreate = async function(event, goalId) {
+window.handleInlineTaskCreate = async function (event, goalId) {
   if (event && event.preventDefault) event.preventDefault();
   const form = event.target || event.currentTarget;
   const submitBtn = form?.querySelector('button[type="submit"]') || form?.querySelector('.btn-primary-emerald');
@@ -5327,50 +5385,53 @@ window.handleInlineTaskCreate = async function(event, goalId) {
   }, 'Please wait — adding task...');
 };
 
-window.toggleTaskCompletion = async function(taskId, goalId) {
-  try {
-    const res = await fetch(`/api/tasks/${taskId}/toggle`, { method: 'PATCH' });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      showToast(data.error || 'Failed to update task completion.', 'error');
-      return;
-    }
-
-    const updatedTask = data.task;
-    const updatedTasks = (Store.state.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
-
-    const updatedGoals = (Store.state.goals || []).map((g) => {
-      if (g.id === goalId || (g.tasks && g.tasks.some((t) => t.id === taskId))) {
-        const goalTasks = (g.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
-        const total = goalTasks.length;
-        const comp = goalTasks.filter((t) => t.completed).length;
-        const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
-        return {
-          ...g,
-          tasks: goalTasks,
-          totalTasks: total,
-          completedTasks: comp,
-          progress,
-          health: calculateGoalHealth({ ...g, progress })
-        };
+window.toggleTaskCompletion = async function(taskId, goalId, el) {
+  const checkboxEl = (el && el.nodeType === 1) ? el : document.querySelector(`.task-checkbox-custom[onclick*="${taskId}"], .goal-task-checkbox[onclick*="${taskId}"]`);
+  return withActionLock('toggle_task_' + taskId, checkboxEl, null, async () => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/toggle`, { method: 'PATCH' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to update task completion.', 'error');
+        return;
       }
-      return g;
-    });
 
-    Store.setState({ tasks: updatedTasks, goals: updatedGoals });
-    await Store.loadTodaySchedule();
-    await Store.loadInsights();
-    renderGoals(Store.state);
-    renderHome(Store.state);
-    renderTasks(Store.state);
-    if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
-    if (Store.state.currentView === 'insights') renderInsights(Store.state);
-  } catch (err) {
-    showToast('Network error updating task.', 'error');
-  }
+      const updatedTask = data.task;
+      const updatedTasks = (Store.state.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
+
+      const updatedGoals = (Store.state.goals || []).map((g) => {
+        if (g.id === goalId || (g.tasks && g.tasks.some((t) => t.id === taskId))) {
+          const goalTasks = (g.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
+          const total = goalTasks.length;
+          const comp = goalTasks.filter((t) => t.completed).length;
+          const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
+          return {
+            ...g,
+            tasks: goalTasks,
+            totalTasks: total,
+            completedTasks: comp,
+            progress,
+            health: calculateGoalHealth({ ...g, progress })
+          };
+        }
+        return g;
+      });
+
+      Store.setState({ tasks: updatedTasks, goals: updatedGoals });
+      await Store.loadTodaySchedule();
+      await Store.loadInsights();
+      renderGoals(Store.state);
+      renderHome(Store.state);
+      renderTasks(Store.state);
+      if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
+      if (Store.state.currentView === 'insights') renderInsights(Store.state);
+    } catch (err) {
+      showToast('Network error updating task.', 'error');
+    }
+  }, 'Please wait — updating task...');
 };
 
-window.openEditTaskModal = function(taskId) {
+window.openEditTaskModal = function (taskId) {
   const task = (Store.state.tasks || []).find((t) => t.id === taskId);
   if (!task) return;
 
@@ -5395,7 +5456,7 @@ window.openEditTaskModal = function(taskId) {
   window.openModal('editTaskModal');
 };
 
-window.handleEditTaskFormSubmit = async function(event) {
+window.handleEditTaskFormSubmit = async function (event) {
   event.preventDefault();
   const taskId = document.getElementById('editTaskId')?.value;
   const goalId = document.getElementById('editTaskGoalId')?.value;
@@ -5466,7 +5527,7 @@ window.handleEditTaskFormSubmit = async function(event) {
   });
 };
 
-window.openDeleteTaskModal = function(taskId) {
+window.openDeleteTaskModal = function (taskId) {
   const task = (Store.state.tasks || []).find((t) => t.id === taskId);
   if (!task) return;
 
@@ -5577,7 +5638,7 @@ async function loadAiSettingsIntoSettingsPage(options = {}) {
 window.loadAiSettingsIntoSettingsPage = loadAiSettingsIntoSettingsPage;
 
 // Open Gemini Key Modal
-window.openGeminiKeyModal = function() {
+window.openGeminiKeyModal = function () {
   const modalInput = document.getElementById('modalGeminiApiKey');
   const errorMsg = document.getElementById('modalAiKeyErrorMsg');
   const title = document.getElementById('aiKeyModalTitle');
@@ -5608,7 +5669,7 @@ window.openGeminiKeyModal = function() {
 };
 
 // Handle saving key from the modal
-window.handleSaveAiKeyFromModal = async function(event) {
+window.handleSaveAiKeyFromModal = async function (event) {
   if (event && event.preventDefault) event.preventDefault();
 
   const modalInput = document.getElementById('modalGeminiApiKey');
@@ -5674,7 +5735,7 @@ window.handleSaveAiKeyFromModal = async function(event) {
 };
 
 // Remove personal key from settings
-window.removePersonalApiKeyFromSettings = async function() {
+window.removePersonalApiKeyFromSettings = async function () {
   const btn = document.querySelector('[onclick="removePersonalApiKeyFromSettings()"]');
   return withActionLock('removeAiKey', btn, 'Removing...', async () => {
     const feedback = document.getElementById('aiSettingsFeedbackMsg');
@@ -5698,7 +5759,7 @@ window.removePersonalApiKeyFromSettings = async function() {
 };
 
 // Test connection endpoint caller
-window.testAiProviderConnection = async function() {
+window.testAiProviderConnection = async function () {
   const testBtn = document.getElementById('testAiConnectionBtn');
   const feedback = document.getElementById('aiSettingsFeedbackMsg');
 
@@ -5764,7 +5825,7 @@ window.testAiProviderConnection = async function() {
 };
 
 // Toggle API key password/text visibility
-window.toggleApiKeyVisibility = function(inputId, btn) {
+window.toggleApiKeyVisibility = function (inputId, btn) {
   const input = document.getElementById(inputId);
   if (!input) return;
   if (input.type === 'password') {
@@ -5777,7 +5838,7 @@ window.toggleApiKeyVisibility = function(inputId, btn) {
 };
 
 // Provider Selection Modal Handling
-window.openAiProviderModal = async function(onConfiguredCallback) {
+window.openAiProviderModal = async function (onConfiguredCallback) {
   pendingEstimateResumeCallback = onConfiguredCallback || null;
   const settings = window.ekagraAiSettings || await fetchAiSettings();
 
@@ -5813,7 +5874,7 @@ window.openAiProviderModal = async function(onConfiguredCallback) {
   window.openModal('aiProviderSelectModal');
 };
 
-window.selectAiModalChoice = function(mode) {
+window.selectAiModalChoice = function (mode) {
   const defaultChoice = document.getElementById('aiModalChoiceDefault');
   const userKeyChoice = document.getElementById('aiModalChoiceUserKey');
   const radioDefault = document.getElementById('aiModalRadioDefault');
@@ -5833,7 +5894,7 @@ window.selectAiModalChoice = function(mode) {
   }
 };
 
-window.confirmAiModalChoice = async function() {
+window.confirmAiModalChoice = async function () {
   const radioUserKey = document.getElementById('aiModalRadioUserKey');
   const isUserKey = radioUserKey && radioUserKey.checked;
   const keyInput = document.getElementById('aiModalApiKeyInput');
@@ -5939,7 +6000,7 @@ window.confirmAiModalChoice = async function() {
 };
 
 // Primary AI Estimate Handler
-window.goToAiSettings = function() {
+window.goToAiSettings = function () {
   if (typeof closeModal === 'function') {
     closeModal('newTaskModal');
     closeModal('editTaskModal');
@@ -5959,7 +6020,7 @@ window.goToAiSettings = function() {
   }, 100);
 };
 
-window.focusManualDurationInput = function(actionBtn) {
+window.focusManualDurationInput = function (actionBtn) {
   const form = actionBtn?.closest('form') || actionBtn?.closest('.inline-task-create-box') || actionBtn?.closest('.modal-frosted-card') || document;
   const durationInput = form.querySelector('.inline-task-duration-input') || document.getElementById('editTaskDuration') || document.getElementById('wizardTaskDuration');
   if (durationInput) {
@@ -5968,7 +6029,7 @@ window.focusManualDurationInput = function(actionBtn) {
   }
 };
 
-window.handleAiEstimateClick = async function(btn, noticeSelector, inputSelector) {
+window.handleAiEstimateClick = async function (btn, noticeSelector, inputSelector) {
   if (!btn) return;
 
   const form = btn.closest('form') || btn.closest('.inline-task-create-box') || btn.closest('.modal-frosted-card');
@@ -6003,7 +6064,7 @@ window.handleAiEstimateClick = async function(btn, noticeSelector, inputSelector
     if (!settings) {
       try {
         settings = await fetchAiSettings();
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const hasKey = Boolean(settings && settings.hasKey);
@@ -6065,7 +6126,7 @@ async function executeEstimationRequest({
 
   const clientController = new AbortController();
   const clientTimeoutTimer = setTimeout(() => {
-    try { clientController.abort(); } catch (_) {}
+    try { clientController.abort(); } catch (_) { }
   }, 16000); // 16s client safety timeout
 
   try {
@@ -6170,8 +6231,8 @@ async function executeEstimationRequest({
           durationInput.value = data.estimated_minutes;
         }
         if (notice) {
-          const breakdownTip = data.milestone_breakdown_recommended 
-            ? `<div style="margin-top: 4px; font-weight: 600; color: var(--accent-amber);">📌 Tip: This task is unusually large (>4h). Consider breaking it down into smaller milestones.</div>` 
+          const breakdownTip = data.milestone_breakdown_recommended
+            ? `<div style="margin-top: 4px; font-weight: 600; color: var(--accent-amber);">📌 Tip: This task is unusually large (>4h). Consider breaking it down into smaller milestones.</div>`
             : '';
           notice.innerHTML = `✨ <strong>AI estimate: ~${data.estimated_minutes} min</strong>${data.range ? ` (${data.range.min}–${data.range.max} min range)` : ''}${data.confidence ? ` • ${data.confidence} confidence` : ''}. <em>${escapeHtml(data.estimate_reason || '')}</em> — adjust to suit your pace.${breakdownTip}`;
           notice.style.display = 'block';
@@ -6324,7 +6385,7 @@ function renderClarificationArea({ clarifyBox, question, onSubmit, onCancel }) {
 }
 
 
-window.closeModal = function(modalId) {
+window.closeModal = function (modalId) {
   const el = document.getElementById(modalId);
   if (el) el.classList.remove('open');
   if (typeof window.updateGlobalRoutineBanner === 'function') {
