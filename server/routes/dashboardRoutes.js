@@ -450,7 +450,10 @@ router.get('/bootstrap', requireAuth, async (req, res) => {
       scheduleSettings: dashData.schedule_settings || null,
       preferences: dashData.preferences || dashData.user_preferences || null,
       metrics: dashData.metrics || null,
-      isColdStart: Boolean(dashData.isColdStart)
+      isColdStart: Boolean(dashData.isColdStart),
+      allScheduledTaskIds: schedData.all_scheduled_task_ids || [],
+      allActiveBlocks: schedData.all_active_blocks || [],
+      allScheduledBlocks: schedData.all_active_blocks || []
     });
   } catch (err) {
     console.error('[GET /api/dashboard/bootstrap Error]', err);

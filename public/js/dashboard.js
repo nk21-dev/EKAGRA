@@ -330,7 +330,10 @@ const Store = {
         ...this.state,
         ...cached.state,
         currentView: initialView,
-        user: cached.user
+        user: cached.user,
+        all_scheduled_task_ids: cached.state.all_scheduled_task_ids || (cached.state.todaySchedule && cached.state.todaySchedule.all_scheduled_task_ids) || [],
+        all_active_blocks: cached.state.all_active_blocks || (cached.state.todaySchedule && cached.state.todaySchedule.all_active_blocks) || [],
+        all_scheduled_blocks: cached.state.all_active_blocks || (cached.state.todaySchedule && cached.state.todaySchedule.all_active_blocks) || []
       };
       this.isLoaded = true;
 
@@ -362,6 +365,9 @@ const Store = {
           routines: state.routines || [],
           insightsData: state.insightsData || null,
           todaySchedule: state.todaySchedule || { blocks: [], routines: [] },
+          all_scheduled_task_ids: state.all_scheduled_task_ids || [],
+          all_active_blocks: state.all_active_blocks || [],
+          all_scheduled_blocks: state.all_active_blocks || [],
           routine_coverage_status: state.routine_coverage_status || null,
           routine_coverage_incomplete: Boolean(state.routine_coverage_incomplete),
           is_routine_complete: Boolean(state.is_routine_complete),
@@ -409,7 +415,7 @@ const Store = {
   // Load initial data from unified bootstrap endpoint
   async init() {
     renderCurrentDateAndGreeting();
-    const initialView = getInitialView();
+    const initialView = this.state.currentView || getInitialView();
     this.state.currentView = initialView;
 
     const cachedUid = localStorage.getItem('ekagra_last_uid') || sessionStorage.getItem('ekagra_last_uid');
@@ -475,8 +481,13 @@ const Store = {
           blocks: todayScheduleData.blocks || [],
           routines: todayScheduleData.routines || [],
           coverageStatus: covStatus,
-          next_task: todayScheduleData.next_task || null
+          next_task: todayScheduleData.next_task || null,
+          all_scheduled_task_ids: todayScheduleData.all_scheduled_task_ids || bootstrap.allScheduledTaskIds || [],
+          all_active_blocks: todayScheduleData.all_active_blocks || bootstrap.allActiveBlocks || []
         },
+        all_scheduled_task_ids: todayScheduleData.all_scheduled_task_ids || bootstrap.allScheduledTaskIds || [],
+        all_active_blocks: todayScheduleData.all_active_blocks || bootstrap.allActiveBlocks || [],
+        all_scheduled_blocks: todayScheduleData.all_active_blocks || bootstrap.allActiveBlocks || [],
         routine_coverage_status: covStatus,
         routine_coverage_incomplete: covStatus ? covStatus.routine_coverage_incomplete : Boolean(dashData.routine_coverage_incomplete),
         is_routine_complete: covStatus ? covStatus.is_routine_complete : Boolean(dashData.is_routine_complete),
@@ -571,12 +582,19 @@ const Store = {
       if (res.ok) {
         const data = await res.json();
         const covStatus = data.routine_coverage_status || null;
+        const allSchedIds = data.all_scheduled_task_ids || [];
+        const allActBlocks = data.all_active_blocks || [];
         this.setState({
           todaySchedule: {
             blocks: data.blocks || [],
             routines: data.routines || [],
-            coverageStatus: covStatus
+            coverageStatus: covStatus,
+            all_scheduled_task_ids: allSchedIds,
+            all_active_blocks: allActBlocks
           },
+          all_scheduled_task_ids: allSchedIds.length > 0 ? allSchedIds : this.state.all_scheduled_task_ids,
+          all_active_blocks: allActBlocks.length > 0 ? allActBlocks : this.state.all_active_blocks,
+          all_scheduled_blocks: allActBlocks.length > 0 ? allActBlocks : this.state.all_scheduled_blocks,
           routine_coverage_status: covStatus || this.state.routine_coverage_status,
           is_routine_complete: covStatus ? covStatus.is_routine_complete : this.state.is_routine_complete,
           routine_coverage_incomplete: covStatus ? covStatus.routine_coverage_incomplete : this.state.routine_coverage_incomplete,
@@ -725,8 +743,43 @@ function initSidebarRouter() {
   });
 }
 
+function updateScheduleTodayButtonHighlight(targetDate) {
+  const todayBtn = document.getElementById('scheduleTodayBtn');
+  if (!todayBtn) return;
+  const currentKey = formatLocalDateKey(targetDate || (Store.state && Store.state.scheduleDate) || new Date());
+  const todayKey = formatLocalDateKey(new Date());
+  const isToday = currentKey === todayKey;
+  todayBtn.classList.toggle('highlight-today-btn', !isToday);
+  todayBtn.title = isToday ? 'Current Day (Today)' : 'Viewing different date — click to jump to Today';
+}
+window.updateScheduleTodayButtonHighlight = updateScheduleTodayButtonHighlight;
+
+window.openScheduleTodayDayView = function () {
+  scheduleFetchId++;
+  Store.state.scheduleDate = new Date();
+  Store.state.scheduleViewMode = 'Day';
+  document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === 'Day');
+  });
+  switchView('schedule');
+};
+
 function switchView(viewName) {
+  if (viewName === 'schedule') {
+    scheduleFetchId++;
+    Store.state.scheduleDate = new Date();
+    Store.state.scheduleViewMode = 'Day';
+    document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-mode') === 'Day');
+    });
+  }
+
   Store.setState({ currentView: viewName });
+  try {
+    if (window.location.hash !== `#${viewName}`) {
+      history.replaceState(null, '', `#${viewName}`);
+    }
+  } catch (e) { }
 
   // Update active sidebar pill
   document.querySelectorAll('.nav-link-btn').forEach((btn) => {
@@ -995,7 +1048,7 @@ window.onQuickCheckInInputChange = function () {
   });
 };
 
-window.submitQuickCheckIn = async function(isVerified, btnEl) {
+window.submitQuickCheckIn = async function (isVerified, btnEl) {
   if (!activeCheckInTask) return;
   const taskId = activeCheckInTask.taskId;
   const estMins = activeCheckInTask.estMinutes;
@@ -1027,7 +1080,7 @@ window.submitQuickCheckIn = async function(isVerified, btnEl) {
   }, 'Please wait — still processing...', { disableSiblings: true });
 };
 
-window.handleTaskCheckboxClick = function(taskId, goalId, el) {
+window.handleTaskCheckboxClick = function (taskId, goalId, el) {
   const task = (Store.state.tasks || []).find((t) => t.id === taskId);
   if (task && (task.completed === 1 || task.completed === true)) {
     // Unchecking: directly toggle off
@@ -1077,7 +1130,7 @@ window.handleHomeCompleteNextTask = async function (taskId, actualMinutes = null
   }, 'Please wait — still processing...');
 };
 
-window.handleHomeRescheduleNextTask = async function(taskId, btnEl) {
+window.handleHomeRescheduleNextTask = async function (taskId, btnEl) {
   const btn = (btnEl && btnEl.nodeType === 1) ? btnEl : document.querySelector(`[onclick*="handleHomeRescheduleNextTask('${taskId}')"], [onclick*="rescheduleScheduledBlock('${taskId}')"]`);
   return withActionLock('task_action_' + taskId, btn, 'Rescheduling...', async () => {
     if (isTaskActionInFlight) return;
@@ -2008,7 +2061,7 @@ window.handleTaskSearch = function (e) {
   Store.setState({ taskSearch: e.target.value });
 };
 
-window.rescheduleTask = function(taskId, btnEl) {
+window.rescheduleTask = function (taskId, btnEl) {
   window.handleHomeRescheduleNextTask(taskId, btnEl);
 };
 
@@ -2039,12 +2092,26 @@ function renderScheduleWeekView(state, streamContainer) {
   const endStr = endD.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const titleEl = document.getElementById('scheduleCurrentDateTitle');
   if (titleEl) titleEl.textContent = `Week: ${startStr} – ${endStr}`;
+  updateScheduleTodayButtonHighlight(current);
 
   const allTasks = state.tasks || [];
   const scheduleSettings = state.scheduleSettings || { weekends_days: ['Saturday', 'Sunday'], weekdays_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] };
   const weekendsDays = scheduleSettings.weekends_days || ['Saturday', 'Sunday'];
   const todayIso = formatLocalDateKey(new Date());
   const selectedIso = formatLocalDateKey(current);
+
+  const allBlocks = [
+    ...(state.all_active_blocks || []),
+    ...(state.all_scheduled_blocks || []),
+    ...((state.todaySchedule && state.todaySchedule.all_active_blocks) || []),
+    ...((state.todaySchedule && state.todaySchedule.blocks) || [])
+  ];
+  const blockMap = new Map();
+  allBlocks.forEach((b) => {
+    const key = b.id || `${b.task_id}_${b.scheduled_date}_${b.start_time}`;
+    if (!blockMap.has(key)) blockMap.set(key, b);
+  });
+  const uniqueBlocks = Array.from(blockMap.values());
 
   const daysHtml = weekDays.map((d) => {
     const dateIso = formatLocalDateKey(d);
@@ -2053,30 +2120,54 @@ function renderScheduleWeekView(state, streamContainer) {
     const isSelected = dateIso === selectedIso;
     const isToday = dateIso === todayIso;
 
-    // Filter tasks for this day: matching due date or scheduled blocks
-    const dayTasks = allTasks.filter((t) => formatLocalDateKey(t.due_date) === dateIso || (isToday && !t.due_date && !t.completed));
-    const completedTasks = dayTasks.filter((t) => t.completed).length;
+    // Filter tasks for this day: matching scheduled blocks or due date
+    const dayBlocks = uniqueBlocks.filter((b) => b.scheduled_date === dateIso);
+    const dayBlockTaskIds = new Set(dayBlocks.map((b) => String(b.task_id)));
+
+    const dayDueTasks = allTasks.filter((t) => formatLocalDateKey(t.due_date) === dateIso && !dayBlockTaskIds.has(String(t.id)));
+
+    const dayItems = [
+      ...dayBlocks.map((b) => ({
+        id: b.task_id || b.id,
+        title: b.task_title || b.title || 'Focus Task',
+        priority: b.task_priority || b.priority || 'Medium',
+        completed: Boolean(b.task_completed || b.status === 'completed'),
+        timeSlot: b.start_time ? formatTime12Hour(b.start_time) : null
+      })),
+      ...dayDueTasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority || 'Medium',
+        completed: Boolean(t.completed),
+        timeSlot: null
+      }))
+    ];
+
+    const completedTasks = dayItems.filter((t) => t.completed).length;
 
     return `
       <div class="week-day-card ${isSelected ? 'active-day' : ''}">
         <div class="week-day-header">
           <div>
             <div class="week-day-title">${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}${isToday ? ' (Today)' : ''}</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${dayTasks.length} task${dayTasks.length === 1 ? '' : 's'}${completedTasks > 0 ? ` · ${completedTasks} done` : ''}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${dayItems.length} task${dayItems.length === 1 ? '' : 's'}${completedTasks > 0 ? ` · ${completedTasks} done` : ''}</div>
           </div>
           <span class="week-day-badge ${isWeekend ? 'weekend' : 'weekday'}">${isWeekend ? 'Weekend' : 'Weekday'}</span>
         </div>
 
         <div class="week-day-tasks-list">
-          ${dayTasks.length === 0 ? `
+          ${dayItems.length === 0 ? `
             <div style="font-size: 0.76rem; color: var(--text-muted); font-style: italic; padding: 12px 0; text-align: center;">No scheduled tasks</div>
-          ` : dayTasks.slice(0, 4).map((t) => `
+          ` : dayItems.slice(0, 4).map((t) => `
             <div class="week-task-item">
-              <span style="font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px; ${t.completed ? 'text-decoration: line-through; color: var(--text-muted);' : 'color: var(--text-primary);'}">${escapeHtml(t.title)}</span>
-              <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.64rem;">${escapeHtml(t.priority || 'Medium')}</span>
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1;">
+                ${t.timeSlot ? `<span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 500; white-space: nowrap;">${escapeHtml(t.timeSlot)}</span>` : ''}
+                <span style="font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; ${t.completed ? 'text-decoration: line-through; color: var(--text-muted);' : 'color: var(--text-primary);'}">${escapeHtml(t.title)}</span>
+              </div>
+              <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.64rem; flex-shrink: 0;">${escapeHtml(t.priority || 'Medium')}</span>
             </div>
           `).join('')}
-          ${dayTasks.length > 4 ? `<div style="font-size: 0.72rem; color: var(--text-muted); text-align: center;">+${dayTasks.length - 4} more</div>` : ''}
+          ${dayItems.length > 4 ? `<div style="font-size: 0.72rem; color: var(--text-muted); text-align: center;">+${dayItems.length - 4} more</div>` : ''}
         </div>
 
         <button type="button" class="btn-secondary-pill" style="width: 100%; justify-content: center; font-size: 0.76rem; padding: 6px;" onclick="selectScheduleDateAndMode('${dateIso}', 'Day')">
@@ -2095,6 +2186,27 @@ function renderScheduleWeekView(state, streamContainer) {
       ${daysHtml}
     </div>
   `;
+
+  // Background fetch 7-day range to revalidate
+  const startIso = formatLocalDateKey(monday);
+  const endIso = formatLocalDateKey(weekDays[6]);
+  const rangeKey = `${startIso}_${endIso}`;
+  if (!state._weekFetchInFlight && state._weekRangeFetched !== rangeKey) {
+    state._weekFetchInFlight = true;
+    fetch(`/api/schedule?start_date=${startIso}&end_date=${endIso}`)
+      .then((r) => r.json())
+      .then((data) => {
+        state._weekFetchInFlight = false;
+        if (data.success && data.blocks) {
+          state.all_active_blocks = data.all_active_blocks || data.blocks;
+          state._weekRangeFetched = rangeKey;
+          if (Store.state.scheduleViewMode === 'Week' && Store.state.currentView === 'schedule') {
+            renderScheduleWeekView(Store.state, streamContainer);
+          }
+        }
+      })
+      .catch(() => { state._weekFetchInFlight = false; });
+  }
 }
 
 function renderScheduleMonthView(state, streamContainer) {
@@ -2108,11 +2220,25 @@ function renderScheduleMonthView(state, streamContainer) {
 
   const titleEl = document.getElementById('scheduleCurrentDateTitle');
   if (titleEl) titleEl.textContent = monthTitle;
+  updateScheduleTodayButtonHighlight(current);
 
   const startOffset = (firstDay.getDay() + 6) % 7;
   const todayIso = formatLocalDateKey(new Date());
   const allTasks = state.tasks || [];
   const allGoals = state.goals || [];
+
+  const allBlocks = [
+    ...(state.all_active_blocks || []),
+    ...(state.all_scheduled_blocks || []),
+    ...((state.todaySchedule && state.todaySchedule.all_active_blocks) || []),
+    ...((state.todaySchedule && state.todaySchedule.blocks) || [])
+  ];
+  const blockMap = new Map();
+  allBlocks.forEach((b) => {
+    const key = b.id || `${b.task_id}_${b.scheduled_date}_${b.start_time}`;
+    if (!blockMap.has(key)) blockMap.set(key, b);
+  });
+  const uniqueBlocks = Array.from(blockMap.values());
 
   const cells = [];
   for (let i = 0; i < startOffset; i++) {
@@ -2128,10 +2254,28 @@ function renderScheduleMonthView(state, streamContainer) {
       return gIso === dateIso;
     });
 
-    const dayTasks = allTasks.filter((t) => {
-      const tIso = formatLocalDateKey(t.due_date || t.scheduled_date);
-      return tIso === dateIso;
+    const dayBlocks = uniqueBlocks.filter((b) => b.scheduled_date === dateIso);
+    const dayBlockTaskIds = new Set(dayBlocks.map((b) => String(b.task_id)));
+
+    const dueTasks = allTasks.filter((t) => {
+      const tIso = formatLocalDateKey(t.due_date);
+      return tIso === dateIso && !dayBlockTaskIds.has(String(t.id));
     });
+
+    const dayTasks = [
+      ...dayBlocks.map((b) => ({
+        id: b.task_id || b.id,
+        title: b.task_title || b.title || 'Focus Task',
+        completed: Boolean(b.task_completed || b.status === 'completed'),
+        priority: b.task_priority || b.priority || 'Medium'
+      })),
+      ...dueTasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        completed: Boolean(t.completed),
+        priority: t.priority || 'Medium'
+      }))
+    ];
 
     cells.push(`
       <div class="month-day-cell ${isToday ? 'is-today' : ''}" onclick="selectScheduleDateAndMode('${dateIso}', 'Day')">
@@ -2164,98 +2308,138 @@ function renderScheduleMonthView(state, streamContainer) {
       </div>
     </div>
   `;
+
+  // Background fetch full month to revalidate
+  const monthStartIso = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+  const monthEndIso = `${year}-${String(month + 1).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`;
+  const rangeKey = `${monthStartIso}_${monthEndIso}`;
+  if (!state._monthFetchInFlight && state._monthRangeFetched !== rangeKey) {
+    state._monthFetchInFlight = true;
+    fetch(`/api/schedule?start_date=${monthStartIso}&end_date=${monthEndIso}`)
+      .then((r) => r.json())
+      .then((data) => {
+        state._monthFetchInFlight = false;
+        if (data.success && data.blocks) {
+          state.all_active_blocks = data.all_active_blocks || data.blocks;
+          state._monthRangeFetched = rangeKey;
+          if (Store.state.scheduleViewMode === 'Month' && Store.state.currentView === 'schedule') {
+            renderScheduleMonthView(Store.state, streamContainer);
+          }
+        }
+      })
+      .catch(() => { state._monthFetchInFlight = false; });
+  }
 }
 
-async function renderSchedule(state) {
-  const streamContainer = document.getElementById('scheduleStreamContainer');
-  if (!streamContainer) return;
-
-  const mode = state.scheduleViewMode || 'Day';
-  document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
-    btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
-  });
-
-  if (mode === 'Week') {
-    renderScheduleWeekView(state, streamContainer);
-    return;
-  }
-  if (mode === 'Month') {
-    renderScheduleMonthView(state, streamContainer);
-    return;
-  }
-
+function renderScheduleDayTimeline(state, streamContainer, blocks = [], routines = [], dateIso = null, serverData = null) {
   const now = parseLocalDate(state.scheduleDate || new Date());
-  const dateIso = formatLocalDateKey(now);
+  const currentDateIso = dateIso || formatLocalDateKey(now);
   const dateStr = now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   const titleEl = document.getElementById('scheduleCurrentDateTitle');
   if (titleEl) titleEl.textContent = dateStr;
+  updateScheduleTodayButtonHighlight(now);
 
-  const thisFetchId = ++scheduleFetchId;
-  let blocks = [];
-  let routines = [];
+  const globalScheduledTaskIds = new Set(
+    (
+      state.all_scheduled_task_ids ||
+      (state.todaySchedule && state.todaySchedule.all_scheduled_task_ids) ||
+      (serverData && serverData.all_scheduled_task_ids) ||
+      []
+    ).map(String)
+  );
 
-  try {
-    const res = await fetch(`/api/schedule?date=${dateIso}`);
-    const data = await res.json();
-    if (thisFetchId !== scheduleFetchId || Store.state.scheduleViewMode !== 'Day' || Store.state.currentView !== 'schedule') {
-      return;
+  const allActiveBlocks = [
+    ...(state.all_active_blocks || []),
+    ...(state.all_scheduled_blocks || []),
+    ...((state.todaySchedule && state.todaySchedule.all_active_blocks) || []),
+    ...((serverData && serverData.all_active_blocks) || [])
+  ];
+
+  allActiveBlocks.forEach((b) => {
+    if (b.status === 'scheduled') {
+      globalScheduledTaskIds.add(String(b.task_id));
     }
-    if (data.success) {
-      blocks = data.blocks || [];
-      routines = data.routines || [];
-      if (data.routine_coverage_status) {
-        Store.state.routine_coverage_status = data.routine_coverage_status;
-        Store.state.routine_coverage_incomplete = data.routine_coverage_status.routine_coverage_incomplete;
-        Store.state.is_routine_complete = data.routine_coverage_status.is_routine_complete;
-        Store.state.incomplete_group = data.routine_coverage_status.incomplete_group;
-        Store.state.routine_warning_message = data.routine_coverage_status.message;
-        window.updateGlobalRoutineBanner(Store.state);
-      }
-    }
-  } catch (e) {
-    if (thisFetchId !== scheduleFetchId || Store.state.scheduleViewMode !== 'Day' || Store.state.currentView !== 'schedule') {
-      return;
-    }
-  }
+  });
 
-  if (thisFetchId !== scheduleFetchId || Store.state.scheduleViewMode !== 'Day' || Store.state.currentView !== 'schedule') {
-    return;
-  }
+  blocks.forEach((b) => {
+    if (b.status === 'scheduled') {
+      globalScheduledTaskIds.add(String(b.task_id));
+    }
+  });
 
-  // If no backend blocks and no routines, display starter box
-  if (blocks.length === 0 && routines.length === 0) {
-    const unscheduledTasks = (state.tasks || []).filter((t) => !t.completed);
-    let queueHtml = '';
-    if (unscheduledTasks.length > 0) {
-      queueHtml = `
-        <div class="unscheduled-queue-card" style="margin-top: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">Unscheduled Queue</span>
-              <span class="category-pill" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; font-size: 0.72rem;">${unscheduledTasks.length} pending</span>
-            </div>
-            <button type="button" class="btn-primary-emerald" style="padding: 4px 12px; font-size: 0.76rem;" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule</button>
-          </div>
-          <div class="unscheduled-queue-list">
-            ${unscheduledTasks.map((t) => `
-              <div class="unscheduled-task-row">
-                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-                  <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(t.title)}</span>
-                  <span style="font-size: 0.72rem; color: var(--text-muted);">⏱️ ${t.duration_minutes || 30}m</span>
-                  <span class="category-pill" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.12); color: var(--brand-emerald);">${escapeHtml(t.goal_title || 'Personal')}</span>
-                  <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.66rem;">${escapeHtml(t.priority || 'Medium')}</span>
-                </div>
-                <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-                  <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px;" onclick="triggerAutoSchedule(this)">⚡ Schedule</button>
-                  <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px; color: var(--brand-emerald);" onclick="openQuickCheckInModal('${t.id}')">✓ Complete</button>
-                </div>
-              </div>
-            `).join('')}
-          </div>
+  // A task is in Unscheduled Queue ONLY if incomplete AND not scheduled on ANY day globally
+  const unscheduledTasks = (state.tasks || []).filter(
+    (t) => !t.completed && !globalScheduledTaskIds.has(String(t.id))
+  );
+
+  const activeBlocks = blocks.filter((b) => b.status === 'scheduled' || b.status === 'completed');
+  const otherScheduledBlocks = allActiveBlocks.filter(
+    (b) => b.scheduled_date !== currentDateIso && (b.status === 'scheduled' || b.status === 'completed')
+  );
+  const todayIso = formatLocalDateKey(new Date());
+  const todayBlocks = otherScheduledBlocks.filter((b) => b.scheduled_date === todayIso && b.status === 'scheduled');
+
+  let emptyDayCalloutHtml = '';
+  if (activeBlocks.length === 0 && otherScheduledBlocks.length > 0) {
+    const todayFormatted = (new Date()).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    let noteText = '';
+    if (todayBlocks.length > 0) {
+      noteText = `No tasks scheduled for ${dateStr} — you have ${todayBlocks.length} task${todayBlocks.length === 1 ? '' : 's'} scheduled on Today (${todayFormatted})`;
+    } else {
+      noteText = `No tasks scheduled for ${dateStr} — you have ${otherScheduledBlocks.length} task${otherScheduledBlocks.length === 1 ? '' : 's'} scheduled on other dates`;
+    }
+
+    emptyDayCalloutHtml = `
+      <div class="schedule-empty-day-callout">
+        <div class="schedule-empty-day-callout-text">
+          ${escapeHtml(noteText)}
         </div>
-      `;
-    }
+        <button type="button" class="btn-primary-emerald" style="padding: 6px 18px; font-size: 0.8rem;" onclick="snapScheduleToday()">
+          Jump to Today
+        </button>
+      </div>
+    `;
+  }
 
+  let unscheduledQueueHtml = '';
+  if (unscheduledTasks.length > 0) {
+    unscheduledQueueHtml = `
+      <div class="unscheduled-queue-card" style="margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">Unscheduled Queue</span>
+            <span class="category-pill" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; font-size: 0.72rem;">${unscheduledTasks.length} pending</span>
+          </div>
+          <button type="button" class="btn-primary-emerald" style="padding: 4px 12px; font-size: 0.76rem;" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule</button>
+        </div>
+        <div class="unscheduled-queue-list">
+          ${unscheduledTasks.map((t) => `
+            <div class="unscheduled-task-row">
+              <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(t.title)}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">⏱️ ${t.duration_minutes || 30}m</span>
+                ${Boolean(t.goal_id || t.goalId)
+                  ? `<span class="category-pill pill-goal" style="font-size: 0.7rem;">🎯 ${escapeHtml(t.goal_title || 'Goal Task')}</span>`
+                  : `<span class="category-pill pill-independent" style="font-size: 0.7rem;">📌 Independent</span>`}
+                <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.66rem;">${escapeHtml(t.priority || 'Medium')}</span>
+              </div>
+              <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+                <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px;" onclick="scheduleSingleTask('${t.id}', this)">⚡ Schedule</button>
+                <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px; color: var(--brand-emerald);" onclick="openQuickCheckInModal('${t.id}')">✓ Complete</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // If no backend blocks and no routines, check if empty day callout or starter box
+  if (blocks.length === 0 && routines.length === 0) {
+    if (emptyDayCalloutHtml) {
+      streamContainer.innerHTML = emptyDayCalloutHtml + unscheduledQueueHtml;
+      return;
+    }
     streamContainer.innerHTML = `
       <div class="schedule-starter-box">
         <div class="schedule-starter-title">Your Day Starts Here 🌱</div>
@@ -2265,7 +2449,7 @@ async function renderSchedule(state) {
           <button class="btn-primary-emerald" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule Goals</button>
         </div>
       </div>
-      ${queueHtml}
+      ${unscheduledQueueHtml}
     `;
     return;
   }
@@ -2294,7 +2478,6 @@ async function renderSchedule(state) {
     });
   }
 
-  const activeBlocks = blocks.filter((b) => b.status === 'scheduled' || b.status === 'completed');
   let taskRankCounter = 1;
   for (const b of activeBlocks) {
     const sMins = (typeof parseTimeToMinutes === 'function') ? parseTimeToMinutes(b.start_time) : 0;
@@ -2375,47 +2558,138 @@ async function renderSchedule(state) {
     `;
   }).join('');
 
-  // Unscheduled tasks queue below the timeline
-  const scheduledTaskIds = new Set(blocks.map((b) => String(b.task_id)));
-  const unscheduledTasks = (state.tasks || []).filter((t) => !t.completed && !scheduledTaskIds.has(String(t.id)));
-
-  let unscheduledQueueHtml = '';
-  if (unscheduledTasks.length > 0) {
-    unscheduledQueueHtml = `
-      <div class="unscheduled-queue-card" style="margin-top: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary);">Unscheduled Queue</span>
-            <span class="category-pill" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; font-size: 0.72rem;">${unscheduledTasks.length} pending</span>
-          </div>
-          <button type="button" class="btn-primary-emerald" style="padding: 4px 12px; font-size: 0.76rem;" onclick="triggerAutoSchedule(this)">⚡ Auto-Schedule</button>
-        </div>
-        <div class="unscheduled-queue-list">
-          ${unscheduledTasks.map((t) => `
-            <div class="unscheduled-task-row">
-              <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
-                <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(t.title)}</span>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">⏱️ ${t.duration_minutes || 30}m</span>
-                ${Boolean(t.goal_id || t.goalId)
-        ? `<span class="category-pill pill-goal" style="font-size: 0.7rem;">🎯 ${escapeHtml(t.goal_title || 'Goal Task')}</span>`
-        : `<span class="category-pill pill-independent" style="font-size: 0.7rem;">📌 Independent</span>`}
-                <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.66rem;">${escapeHtml(t.priority || 'Medium')}</span>
-              </div>
-              <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-                <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px;" onclick="triggerAutoSchedule(this)">⚡ Schedule</button>
-                <button type="button" class="btn-secondary-pill" style="font-size: 0.72rem; padding: 4px 10px; color: var(--brand-emerald);" onclick="openQuickCheckInModal('${t.id}')">✓ Complete</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  streamContainer.innerHTML = timelineHtml + unscheduledQueueHtml;
+  streamContainer.innerHTML = (emptyDayCalloutHtml ? emptyDayCalloutHtml + timelineHtml : timelineHtml) + unscheduledQueueHtml;
 }
 
-window.triggerAutoSchedule = async function(btnEl) {
+async function renderSchedule(state) {
+  const streamContainer = document.getElementById('scheduleStreamContainer');
+  if (!streamContainer) return;
+
+  const mode = state.scheduleViewMode || 'Day';
+  document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+  });
+
+  const now = parseLocalDate(state.scheduleDate || new Date());
+  updateScheduleTodayButtonHighlight(now);
+
+  if (mode === 'Week') {
+    renderScheduleWeekView(state, streamContainer);
+    return;
+  }
+  if (mode === 'Month') {
+    renderScheduleMonthView(state, streamContainer);
+    return;
+  }
+
+  const dateIso = formatLocalDateKey(now);
+  const dateStr = now.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const titleEl = document.getElementById('scheduleCurrentDateTitle');
+  if (titleEl) titleEl.textContent = dateStr;
+
+  const thisFetchId = ++scheduleFetchId;
+  let blocks = [];
+  let routines = [];
+
+  try {
+    const res = await fetch(`/api/schedule?date=${dateIso}`);
+    const data = await res.json();
+    if (thisFetchId !== scheduleFetchId || Store.state.scheduleViewMode !== 'Day' || Store.state.currentView !== 'schedule') {
+      return;
+    }
+    if (data.success) {
+      blocks = data.blocks || [];
+      routines = data.routines || [];
+      if (data.all_scheduled_task_ids) {
+        Store.state.all_scheduled_task_ids = data.all_scheduled_task_ids;
+      }
+      if (data.all_active_blocks) {
+        Store.state.all_active_blocks = data.all_active_blocks;
+      }
+      if (data.routine_coverage_status) {
+        Store.state.routine_coverage_status = data.routine_coverage_status;
+        Store.state.routine_coverage_incomplete = data.routine_coverage_status.routine_coverage_incomplete;
+        Store.state.is_routine_complete = data.routine_coverage_status.is_routine_complete;
+        Store.state.incomplete_group = data.routine_coverage_status.incomplete_group;
+        Store.state.routine_warning_message = data.routine_coverage_status.message;
+        window.updateGlobalRoutineBanner(Store.state);
+      }
+      renderScheduleDayTimeline(state, streamContainer, blocks, routines, dateIso, data);
+    }
+  } catch (e) {
+    if (thisFetchId !== scheduleFetchId || Store.state.scheduleViewMode !== 'Day' || Store.state.currentView !== 'schedule') {
+      return;
+    }
+  }
+}
+
+window.scheduleSingleTask = async function(taskId, btnEl) {
+  if (Store.state.routine_coverage_incomplete) {
+    const msg = Store.state.routine_warning_message ||
+      (Store.state.routine_coverage_status && Store.state.routine_coverage_status.message) ||
+      'Without your full 24-hour schedule, EKAGRA cannot know when you are free vs. busy to schedule your goals.';
+    showToast(msg, 'warning');
+    if (typeof window.openInitialRoutineModal === 'function') {
+      window.openInitialRoutineModal(true);
+    }
+    return;
+  }
+
+  const activeBtn = (btnEl && btnEl.nodeType === 1) ? btnEl : null;
+  return withActionLock('schedule_single_task_' + taskId, activeBtn, 'Scheduling...', async () => {
+    if (isTaskActionInFlight) return;
+    isTaskActionInFlight = true;
+    showToast('Scheduling task...', 'info');
+    try {
+      const res = await fetch('/api/schedule/schedule-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      });
+      const data = await res.json();
+      if (data.routine_coverage_incomplete) {
+        Store.setState({
+          routine_coverage_incomplete: true,
+          is_routine_complete: false,
+          incomplete_group: data.incomplete_group,
+          routine_warning_message: data.message
+        });
+        window.updateGlobalRoutineBanner(Store.state);
+        showToast(data.message || 'Complete your 24-hour routine first.', 'warning');
+        window.openInitialRoutineModal(true);
+        return;
+      }
+      if (res.ok && data.success) {
+        showToast(data.message || 'Task scheduled successfully!', 'success');
+        if (!Array.isArray(Store.state.all_scheduled_task_ids)) {
+          Store.state.all_scheduled_task_ids = [];
+        }
+        if (!Store.state.all_scheduled_task_ids.includes(String(taskId))) {
+          Store.state.all_scheduled_task_ids.push(String(taskId));
+        }
+        await Store.loadTodaySchedule();
+        if (Store.state.currentView === 'schedule') {
+          renderSchedule(Store.state);
+        }
+        if (Store.state.currentView === 'home') {
+          renderHome(Store.state);
+        }
+        if (Store.state.currentView === 'tasks') {
+          renderTasks(Store.state);
+        }
+      } else {
+        showToast(data.error || data.message || 'Could not schedule task.', 'error');
+      }
+    } catch (err) {
+      console.error('Single schedule network error:', err);
+      showToast('Network error while scheduling task.', 'error');
+    } finally {
+      isTaskActionInFlight = false;
+    }
+  }, 'Please wait — still processing...');
+};
+
+window.triggerAutoSchedule = async function (btnEl) {
   if (Store.state.routine_coverage_incomplete) {
     const msg = Store.state.routine_warning_message ||
       (Store.state.routine_coverage_status && Store.state.routine_coverage_status.message) ||
@@ -2486,7 +2760,7 @@ window.completeScheduledBlock = async function (taskId) {
   }
 };
 
-window.missScheduledBlock = async function(taskId, btnEl) {
+window.missScheduledBlock = async function (taskId, btnEl) {
   const btn = (btnEl && btnEl.nodeType === 1) ? btnEl : document.querySelector(`[onclick*="missScheduledBlock('${taskId}')"]`);
   return withActionLock('task_action_' + taskId, btn, 'Updating...', async () => {
     if (isTaskActionInFlight) return;
@@ -2518,7 +2792,7 @@ window.missScheduledBlock = async function(taskId, btnEl) {
   }, 'Please wait — still processing...', { disableSiblings: true });
 };
 
-window.rescheduleScheduledBlock = async function(taskId, btnEl) {
+window.rescheduleScheduledBlock = async function (taskId, btnEl) {
   await window.handleHomeRescheduleNextTask(taskId, btnEl);
 };
 
@@ -2533,12 +2807,21 @@ window.navigateScheduleDay = function (delta) {
   } else {
     current.setDate(current.getDate() + delta);
   }
-  Store.setState({ scheduleDate: current });
+  Store.state.scheduleDate = current;
+  updateScheduleTodayButtonHighlight(current);
+  renderSchedule(Store.state);
 };
 
 window.snapScheduleToday = function () {
   scheduleFetchId++;
-  Store.setState({ scheduleDate: new Date() });
+  const now = new Date();
+  Store.state.scheduleDate = now;
+  Store.state.scheduleViewMode = 'Day';
+  document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === 'Day');
+  });
+  updateScheduleTodayButtonHighlight(now);
+  renderSchedule(Store.state);
 };
 
 window.setScheduleViewMode = function (mode) {
@@ -2546,16 +2829,83 @@ window.setScheduleViewMode = function (mode) {
   document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
   });
-  Store.setState({ scheduleViewMode: mode });
+  Store.state.scheduleViewMode = mode;
+
+  const streamContainer = document.getElementById('scheduleStreamContainer');
+  if (streamContainer) {
+    if (mode === 'Week') {
+      renderScheduleWeekView(Store.state, streamContainer);
+      return;
+    }
+    if (mode === 'Month') {
+      renderScheduleMonthView(Store.state, streamContainer);
+      return;
+    }
+    // Mode is 'Day': Instant switch on Click 1 (0ms delay)
+    const now = parseLocalDate(Store.state.scheduleDate || new Date());
+    const dateIso = formatLocalDateKey(now);
+    const isToday = dateIso === formatLocalDateKey(new Date());
+    if (isToday && Store.state.todaySchedule && (Store.state.todaySchedule.blocks || Store.state.todaySchedule.routines)) {
+      renderScheduleDayTimeline(
+        Store.state,
+        streamContainer,
+        Store.state.todaySchedule.blocks || [],
+        Store.state.todaySchedule.routines || [],
+        dateIso
+      );
+    } else {
+      streamContainer.innerHTML = `
+        <div class="schedule-stream-loading-skeleton">
+          <div class="schedule-skeleton-bar"></div>
+          <div class="schedule-skeleton-bar"></div>
+          <div class="schedule-skeleton-bar"></div>
+        </div>
+      `;
+    }
+  }
+
+  renderSchedule(Store.state);
 };
 
 window.selectScheduleDateAndMode = function (dateIsoString, mode = 'Day') {
   scheduleFetchId++;
   const d = parseLocalDate(dateIsoString);
+  Store.state.scheduleDate = d;
+  Store.state.scheduleViewMode = mode;
   document.querySelectorAll('.schedule-mode-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
   });
-  Store.setState({ scheduleDate: d, scheduleViewMode: mode });
+  const streamContainer = document.getElementById('scheduleStreamContainer');
+  if (streamContainer) {
+    if (mode === 'Day') {
+      const now = d || new Date();
+      const dateIso = formatLocalDateKey(now);
+      const isToday = dateIso === formatLocalDateKey(new Date());
+      if (isToday && Store.state.todaySchedule && (Store.state.todaySchedule.blocks || Store.state.todaySchedule.routines)) {
+        renderScheduleDayTimeline(
+          Store.state,
+          streamContainer,
+          Store.state.todaySchedule.blocks || [],
+          Store.state.todaySchedule.routines || [],
+          dateIso
+        );
+      } else {
+        streamContainer.innerHTML = `
+          <div class="schedule-stream-loading-skeleton">
+            <div class="schedule-skeleton-bar"></div>
+            <div class="schedule-skeleton-bar"></div>
+          </div>
+        `;
+      }
+    } else if (mode === 'Week') {
+      renderScheduleWeekView(Store.state, streamContainer);
+      return;
+    } else if (mode === 'Month') {
+      renderScheduleMonthView(Store.state, streamContainer);
+      return;
+    }
+  }
+  renderSchedule(Store.state);
 };
 
 // ==========================================================================
@@ -5385,7 +5735,7 @@ window.handleInlineTaskCreate = async function (event, goalId) {
   }, 'Please wait — adding task...');
 };
 
-window.toggleTaskCompletion = async function(taskId, goalId, el) {
+window.toggleTaskCompletion = async function (taskId, goalId, el) {
   const checkboxEl = (el && el.nodeType === 1) ? el : document.querySelector(`.task-checkbox-custom[onclick*="${taskId}"], .goal-task-checkbox[onclick*="${taskId}"]`);
   return withActionLock('toggle_task_' + taskId, checkboxEl, null, async () => {
     try {

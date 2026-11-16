@@ -36,7 +36,8 @@ router.post('/generate', requireAuth, async (req, res) => {
   try {
     const result = await generateSchedule(db, userId, {
       clearExisting: Boolean(req.body.clearExisting),
-      daysAhead: req.body.daysAhead ? Number(req.body.daysAhead) : 7
+      daysAhead: req.body.daysAhead ? Number(req.body.daysAhead) : 7,
+      taskId: req.body.taskId || req.body.task_id || null
     });
 
     return res.status(200).json({
@@ -56,16 +57,59 @@ function getLocalDateString(d = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-async function getSchedulePayload(db, userId, rawDate = 'today') {
+async function getSchedulePayload(db, userId, rawDate = 'today', options = {}) {
   let targetDateStr = (rawDate || '').trim();
   if (!targetDateStr || targetDateStr === 'today') {
     targetDateStr = getLocalDateString();
   }
 
+  const startDate = options.startDate || options.start_date;
+  const endDate = options.endDate || options.end_date;
+
   const scheduleGroup = await getDayGroupForDate(db, userId, targetDateStr);
   const coverageStatus = await getRoutineCoverageStatus(db, userId);
 
-  const blocks = (await db.prepare(`
+  let blocks = [];
+  if (startDate && endDate) {
+    blocks = (await db.prepare(`
+      SELECT 
+        sb.*, 
+        t.title as task_title, 
+        t.priority as task_priority, 
+        t.duration_minutes as task_duration,
+        t.due_date as task_due_date,
+        t.completed as task_completed,
+        COALESCE(g.title, 'Personal') as goal_title,
+        COALESCE(g.title, 'Personal') as goal_name,
+        g.priority as goal_priority
+      FROM scheduled_blocks sb
+      LEFT JOIN tasks t ON sb.task_id = t.id
+      LEFT JOIN goals g ON sb.goal_id = g.id
+      WHERE sb.user_id = ? AND sb.scheduled_date BETWEEN ? AND ? AND sb.status IN ('scheduled', 'completed')
+      ORDER BY sb.scheduled_date ASC, sb.start_time ASC
+    `).all(userId, startDate, endDate)) || [];
+  } else {
+    blocks = (await db.prepare(`
+      SELECT 
+        sb.*, 
+        t.title as task_title, 
+        t.priority as task_priority, 
+        t.duration_minutes as task_duration,
+        t.due_date as task_due_date,
+        t.completed as task_completed,
+        COALESCE(g.title, 'Personal') as goal_title,
+        COALESCE(g.title, 'Personal') as goal_name,
+        g.priority as goal_priority
+      FROM scheduled_blocks sb
+      LEFT JOIN tasks t ON sb.task_id = t.id
+      LEFT JOIN goals g ON sb.goal_id = g.id
+      WHERE sb.user_id = ? AND sb.scheduled_date = ? AND sb.status IN ('scheduled', 'completed')
+      ORDER BY sb.start_time ASC
+    `).all(userId, targetDateStr)) || [];
+  }
+
+  // Global query: ALL active scheduled blocks across ALL dates for this user
+  const rawAllActive = (await db.prepare(`
     SELECT 
       sb.*, 
       t.title as task_title, 
@@ -79,9 +123,27 @@ async function getSchedulePayload(db, userId, rawDate = 'today') {
     FROM scheduled_blocks sb
     LEFT JOIN tasks t ON sb.task_id = t.id
     LEFT JOIN goals g ON sb.goal_id = g.id
-    WHERE sb.user_id = ? AND sb.scheduled_date = ? AND sb.status IN ('scheduled', 'completed')
-    ORDER BY sb.start_time ASC
-  `).all(userId, targetDateStr)) || [];
+    WHERE sb.user_id = ? AND sb.status IN ('scheduled', 'completed') AND (t.completed = 0 OR t.completed IS NULL)
+    ORDER BY sb.scheduled_date ASC, sb.start_time ASC
+  `).all(userId)) || [];
+
+  const allActiveBlocks = rawAllActive.map((b) => {
+    const isGoalTask = Boolean(b.goal_id);
+    const isTaskCompleted = Boolean(b.task_completed || b.status === 'completed');
+    return {
+      ...b,
+      status: isTaskCompleted ? 'completed' : b.status,
+      title: b.task_title,
+      task_type: isGoalTask ? 'goal' : 'independent',
+      goal_title: isGoalTask ? (b.goal_title && b.goal_title !== 'Personal' ? b.goal_title : (b.goal_name || 'Goal Task')) : 'Personal',
+      goal_name: isGoalTask ? (b.goal_name || b.goal_title || 'Goal Task') : 'Personal',
+      goal_priority: isGoalTask ? (b.goal_priority || 'Medium') : null
+    };
+  });
+
+  const allScheduledTaskIds = allActiveBlocks
+    .filter((b) => b.status === 'scheduled')
+    .map((b) => String(b.task_id));
 
   const routines = (await db.prepare(`
     SELECT id, name, start_time, end_time, type, availability_type, schedule_group
@@ -114,6 +176,8 @@ async function getSchedulePayload(db, userId, rawDate = 'today') {
     blocks: enrichedBlocks,
     routines,
     next_task: nextTask,
+    all_scheduled_task_ids: allScheduledTaskIds,
+    all_active_blocks: allActiveBlocks,
     routine_coverage_status: coverageStatus,
     is_routine_complete: coverageStatus.is_routine_complete,
     routine_coverage_incomplete: coverageStatus.routine_coverage_incomplete,
@@ -129,11 +193,61 @@ router.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const payload = await getSchedulePayload(db, userId, req.query.date);
+    const payload = await getSchedulePayload(db, userId, req.query.date, {
+      startDate: req.query.start_date || req.query.startDate,
+      endDate: req.query.end_date || req.query.endDate
+    });
     return res.status(200).json(payload);
   } catch (err) {
     console.error('[GET /api/schedule Error]', err);
     return res.status(500).json({ error: 'Failed to fetch schedule.' });
+  }
+});
+
+// POST /api/schedule/schedule-task
+// Schedules a specific task into the earliest available flexible window
+router.post('/schedule-task', requireAuth, async (req, res) => {
+  const db = getDatabase();
+  const userId = req.user.id;
+  const targetTaskId = req.body.taskId || req.body.task_id;
+  let targetDate = req.body.newDate || req.body.new_date || req.body.date;
+  let targetStartTime = req.body.newStartTime || req.body.new_start_time || req.body.startTime;
+
+  if (!targetTaskId) {
+    return res.status(400).json({ error: 'taskId is required.' });
+  }
+
+  // Strict Routine Coverage Gate
+  const coverageStatus = await getRoutineCoverageStatus(db, userId);
+  if (coverageStatus.routine_coverage_incomplete) {
+    return res.status(200).json({
+      success: false,
+      routine_coverage_incomplete: true,
+      incomplete_group: coverageStatus.incomplete_group,
+      message: coverageStatus.message || 'Without your full 24-hour schedule, EKAGRA cannot know when you are free vs. busy to schedule your goals.'
+    });
+  }
+
+  try {
+    if (!targetDate || !targetStartTime) {
+      const nextSlot = await findNextAvailableSlot(db, userId, targetTaskId);
+      if (!nextSlot.success) {
+        return res.status(400).json({ error: nextSlot.error || 'No free routine window available in the next 7 days.' });
+      }
+      targetDate = nextSlot.date;
+      targetStartTime = nextSlot.start_time;
+    }
+
+    const result = await rescheduleTask(db, userId, targetTaskId, targetDate, targetStartTime);
+    return res.status(200).json({
+      success: true,
+      message: 'Task scheduled successfully!',
+      task_id: targetTaskId,
+      taskId: targetTaskId,
+      ...result
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 });
 

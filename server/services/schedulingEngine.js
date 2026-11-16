@@ -535,7 +535,13 @@ function generateScheduleSync(db, userId, options = {}) {
     `).all(userId).map((b) => b.task_id)
   );
 
-  const tasksToSchedule = allTasks.filter((t) => !alreadyScheduledTaskIds.has(t.id));
+  const targetTaskId = options.taskId || options.task_id || null;
+  const tasksToSchedule = allTasks.filter((t) => {
+    if (targetTaskId) {
+      return String(t.id) === String(targetTaskId) && !alreadyScheduledTaskIds.has(t.id);
+    }
+    return !alreadyScheduledTaskIds.has(t.id);
+  });
 
   if (tasksToSchedule.length === 0) {
     return {
@@ -717,7 +723,13 @@ async function generateScheduleAsync(db, userId, options = {}) {
   `).all(userId);
   const alreadyScheduledTaskIds = new Set(alreadyScheduledRows.map((b) => b.task_id));
 
-  const tasksToSchedule = allTasks.filter((t) => !alreadyScheduledTaskIds.has(t.id));
+  const targetTaskId = options.taskId || options.task_id || null;
+  const tasksToSchedule = allTasks.filter((t) => {
+    if (targetTaskId) {
+      return String(t.id) === String(targetTaskId) && !alreadyScheduledTaskIds.has(t.id);
+    }
+    return !alreadyScheduledTaskIds.has(t.id);
+  });
 
   if (tasksToSchedule.length === 0) {
     return {
