@@ -1481,8 +1481,8 @@ function renderHome(state) {
       const pace = learning?.pace_factor || 1.0;
       const calCount = learning?.calibrated_count !== undefined ? learning.calibrated_count : (learning?.completed_count || 0);
       const paceDesc = calCount < 3
-        ? `Baseline pace (1.0x). Calibrates after 3 verified task durations (${calCount}/3 verified).`
-        : `Learned pace factor of ${pace}x calibrated from verified task execution durations.`;
+        ? `Cold Start Calibration: default 1.0x pace active until 3 verified task durations (${calCount}/3 verified).`
+        : `Calibrated from ${calCount} verified task durations.`;
 
       const peakWindow = learning?.peak_focus_window || 'Morning (05:00 AM – 12:00 PM)';
 
@@ -2419,8 +2419,8 @@ function renderScheduleDayTimeline(state, streamContainer, blocks = [], routines
                 <span style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(t.title)}</span>
                 <span style="font-size: 0.72rem; color: var(--text-muted);">⏱️ ${t.duration_minutes || 30}m</span>
                 ${Boolean(t.goal_id || t.goalId)
-                  ? `<span class="category-pill pill-goal" style="font-size: 0.7rem;">🎯 ${escapeHtml(t.goal_title || 'Goal Task')}</span>`
-                  : `<span class="category-pill pill-independent" style="font-size: 0.7rem;">📌 Independent</span>`}
+        ? `<span class="category-pill pill-goal" style="font-size: 0.7rem;">🎯 ${escapeHtml(t.goal_title || 'Goal Task')}</span>`
+        : `<span class="category-pill pill-independent" style="font-size: 0.7rem;">📌 Independent</span>`}
                 <span class="priority-tag prio-${(t.priority || 'medium').toLowerCase()}" style="font-size: 0.66rem;">${escapeHtml(t.priority || 'Medium')}</span>
               </div>
               <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
@@ -2623,7 +2623,7 @@ async function renderSchedule(state) {
   }
 }
 
-window.scheduleSingleTask = async function(taskId, btnEl) {
+window.scheduleSingleTask = async function (taskId, btnEl) {
   if (Store.state.routine_coverage_incomplete) {
     const msg = Store.state.routine_warning_message ||
       (Store.state.routine_coverage_status && Store.state.routine_coverage_status.message) ||
@@ -2668,6 +2668,10 @@ window.scheduleSingleTask = async function(taskId, btnEl) {
           Store.state.all_scheduled_task_ids.push(String(taskId));
         }
         await Store.loadTodaySchedule();
+        const targetDate = data.scheduled_date || data.date;
+        if (targetDate && Store.state.currentView === 'schedule') {
+          Store.state.scheduleDate = parseLocalDate(targetDate);
+        }
         if (Store.state.currentView === 'schedule') {
           renderSchedule(Store.state);
         }
@@ -3381,14 +3385,15 @@ async function renderInsights(state) {
 
   if (kpiCompleted) kpiCompleted.textContent = metrics.completed_tasks;
   if (kpiFocusHours) kpiFocusHours.textContent = `${metrics.focus_hours} hrs`;
-  if (kpiStreak) kpiStreak.textContent = `${metrics.streak} days`;
+  if (kpiStreak) kpiStreak.textContent = `${metrics.streak} ${metrics.streak === 1 ? 'day' : 'days'}`;
 
   // Draw SVG Bezier Curve Chart with real productivity trend data
   const trend = insightsData?.productivity_trend;
   renderProductivityBezierChart(
     trend?.values || [0, 0, 0, 0, 0, 0, 0],
     trend?.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    Boolean(trend?.has_data)
+    Boolean(trend?.has_data),
+    trend?.task_counts || [0, 0, 0, 0, 0, 0, 0]
   );
 
   // Draw SVG Doughnut Breakdown Ring Chart with real task breakdown
@@ -3411,6 +3416,17 @@ async function renderInsights(state) {
       const cap = insightsData.capacity || {};
       const forecasts = insightsData.goal_forecasts || [];
 
+      const getBucketPcts = (bucketData) => {
+        const p = bucketData?.p_complete !== undefined ? bucketData.p_complete : 0.5;
+        const comp = Math.min(100, Math.max(0, Math.round(p * 100)));
+        const risk = 100 - comp;
+        return { comp, risk };
+      };
+      const morningPcts = getBucketPcts(b.morning);
+      const afternoonPcts = getBucketPcts(b.afternoon);
+      const eveningPcts = getBucketPcts(b.evening);
+      const nightPcts = getBucketPcts(b.night);
+
       hubFeed.innerHTML = `
         <!-- Speed Learner Model Card -->
         <div class="insight-card-item" style="border-left: 3px solid var(--brand-emerald);">
@@ -3430,20 +3446,20 @@ async function renderInsights(state) {
             <div class="insight-title">Focus Quality & Slip Risk by Time Bucket</div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 6px;">
               <div style="background: var(--surface-subtle); padding: 6px 8px; border-radius: 8px; font-size: 0.74rem;">
-                <strong>Morning</strong>: ${Math.round((b.morning?.p_complete || 0.5) * 100)}%
-                <div style="color: var(--text-muted);">Risk: ${Math.round((b.morning?.slip_risk || 0.5) * 100)}%</div>
+                <strong>Morning</strong>: ${morningPcts.comp}%
+                <div style="color: var(--text-muted);">Risk: ${morningPcts.risk}%</div>
               </div>
               <div style="background: var(--surface-subtle); padding: 6px 8px; border-radius: 8px; font-size: 0.74rem;">
-                <strong>Afternoon</strong>: ${Math.round((b.afternoon?.p_complete || 0.5) * 100)}%
-                <div style="color: var(--text-muted);">Risk: ${Math.round((b.afternoon?.slip_risk || 0.5) * 100)}%</div>
+                <strong>Afternoon</strong>: ${afternoonPcts.comp}%
+                <div style="color: var(--text-muted);">Risk: ${afternoonPcts.risk}%</div>
               </div>
               <div style="background: var(--surface-subtle); padding: 6px 8px; border-radius: 8px; font-size: 0.74rem;">
-                <strong>Evening</strong>: ${Math.round((b.evening?.p_complete || 0.5) * 100)}%
-                <div style="color: var(--text-muted);">Risk: ${Math.round((b.evening?.slip_risk || 0.5) * 100)}%</div>
+                <strong>Evening</strong>: ${eveningPcts.comp}%
+                <div style="color: var(--text-muted);">Risk: ${eveningPcts.risk}%</div>
               </div>
               <div style="background: var(--surface-subtle); padding: 6px 8px; border-radius: 8px; font-size: 0.74rem;">
-                <strong>Night</strong>: ${Math.round((b.night?.p_complete || 0.5) * 100)}%
-                <div style="color: var(--text-muted);">Risk: ${Math.round((b.night?.slip_risk || 0.5) * 100)}%</div>
+                <strong>Night</strong>: ${nightPcts.comp}%
+                <div style="color: var(--text-muted);">Risk: ${nightPcts.risk}%</div>
               </div>
             </div>
           </div>
@@ -3468,18 +3484,38 @@ async function renderInsights(state) {
             <div class="insight-content" style="width: 100%;">
               <div class="insight-title">Goal Velocity & Pacing Forecasts</div>
               <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
-                ${forecasts.map((g) => `
-                  <div style="display: flex; justify-content: space-between; align-items: center; background: var(--surface-subtle); padding: 6px 10px; border-radius: 8px; font-size: 0.78rem;">
-                    <div>
-                      <strong>${escapeHtml(g.title)}</strong>
-                      <div style="font-size: 0.72rem; color: var(--text-muted);">${g.forecast.remaining_minutes}m left • Burn: ${g.forecast.burn_rate_mins_day}m/day</div>
+                ${forecasts.map((g) => {
+                  const f = g.forecast || {};
+                  let badgeStyle = 'background: rgba(16, 185, 129, 0.15); color: var(--brand-emerald);';
+                  if (f.status === 'Needs Tasks') {
+                    badgeStyle = 'background: rgba(139, 92, 246, 0.15); color: #8b5cf6;';
+                  } else if (f.status === 'At Risk') {
+                    badgeStyle = 'background: rgba(245, 158, 11, 0.15); color: #f59e0b;';
+                  } else if (f.status === 'Behind') {
+                    badgeStyle = 'background: rgba(239, 68, 68, 0.15); color: #ef4444;';
+                  }
+                  const projText = f.status === 'Completed'
+                    ? 'Completed'
+                    : (f.status === 'Needs Tasks'
+                      ? 'Awaiting Tasks'
+                      : `Proj: ${f.projected_completion_date || 'N/A'}`);
+                  return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: var(--surface-subtle); padding: 8px 12px; border-radius: 8px; font-size: 0.78rem;">
+                      <div style="min-width: 0;">
+                        <div style="font-weight: 700; color: var(--text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${escapeHtml(g.title)}</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">
+                          ${f.remaining_minutes || 0}m left • Burn: ${f.burn_rate_mins_day || 0}m/day • Target: ${g.target_date || 'None'}
+                        </div>
+                      </div>
+                      <div style="text-align: right; flex-shrink: 0; margin-left: 12px;">
+                        <span class="category-pill" style="font-size: 0.72rem; ${badgeStyle}">${escapeHtml(f.status || 'On Track')}</span>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">
+                          ${projText} (${f.days_needed || 0}d / ${f.days_left || 0}d)
+                        </div>
+                      </div>
                     </div>
-                    <div style="text-align: right;">
-                      <span class="category-pill" style="font-size: 0.72rem; ${g.forecast.status === 'On Track' ? 'background: rgba(16, 185, 129, 0.15); color: var(--brand-emerald);' : g.forecast.status === 'At Risk' ? 'background: rgba(245, 158, 11, 0.15); color: #f59e0b;' : 'background: rgba(239, 68, 68, 0.15); color: #ef4444;'}">${escapeHtml(g.forecast.status)}</span>
-                      <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">${g.forecast.days_needed}d needed / ${g.forecast.days_left}d left</div>
-                    </div>
-                  </div>
-                `).join('')}
+                  `;
+                }).join('')}
               </div>
             </div>
           </div>
@@ -3511,17 +3547,20 @@ async function renderInsights(state) {
 }
 
 // Interactive SVG Bezier Area Chart
-function renderProductivityBezierChart(points = [0, 0, 0, 0, 0, 0, 0], days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], hasData = false) {
+function renderProductivityBezierChart(points = [0, 0, 0, 0, 0, 0, 0], days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], hasData = false, taskCounts = [0, 0, 0, 0, 0, 0, 0]) {
   const container = document.getElementById('productivityChartContainer');
   if (!container) return;
 
-  const w = 540;
-  const h = 180;
-  const padding = 28;
+  const w = 560;
+  const h = 190;
+  const paddingLeft = 46;
+  const paddingRight = 24;
+  const paddingTop = 24;
+  const paddingBottom = 30;
 
   if (!hasData) {
     container.innerHTML = `
-      <div style="height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--surface-subtle); border-radius: 12px; border: 1px dashed var(--card-border); padding: 16px; text-align: center;">
+      <div style="height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--surface-subtle); border-radius: 12px; border: 1px dashed var(--card-border); padding: 16px; text-align: center;">
         <span style="font-size: 1.4rem; margin-bottom: 6px;">📈</span>
         <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">No productivity data recorded yet</div>
         <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Complete tasks to plot your real 7-day trend.</p>
@@ -3530,11 +3569,18 @@ function renderProductivityBezierChart(points = [0, 0, 0, 0, 0, 0, 0], days = ['
     return;
   }
 
-  const maxVal = Math.max(...points, 60);
+  const rawMax = Math.max(...points, 60);
+  const maxVal = Math.ceil(rawMax / 30) * 30;
+  const midVal = Math.round(maxVal / 2);
+
+  const plotWidth = w - paddingLeft - paddingRight;
+  const plotHeight = h - paddingTop - paddingBottom;
+
   const coords = points.map((val, idx) => {
-    const x = padding + (idx * (w - 2 * padding)) / (points.length - 1);
-    const y = h - padding - (val / maxVal) * (h - 2 * padding);
-    return { x, y, val };
+    const x = paddingLeft + (idx * plotWidth) / (points.length - 1);
+    const y = paddingTop + plotHeight - (val / maxVal) * plotHeight;
+    const tasks = (taskCounts && taskCounts[idx] !== undefined) ? taskCounts[idx] : 0;
+    return { x, y, val, tasks, day: days[idx] || '' };
   });
 
   let pathD = `M ${coords[0].x} ${coords[0].y}`;
@@ -3548,30 +3594,50 @@ function renderProductivityBezierChart(points = [0, 0, 0, 0, 0, 0, 0], days = ['
     pathD += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
   }
 
-  const areaD = `${pathD} L ${coords[coords.length - 1].x} ${h - padding} L ${coords[0].x} ${h - padding} Z`;
+  const bottomY = paddingTop + plotHeight;
+  const areaD = `${pathD} L ${coords[coords.length - 1].x} ${bottomY} L ${coords[0].x} ${bottomY} Z`;
+
+  const yTicks = [
+    { val: maxVal, y: paddingTop, label: `${(maxVal / 60).toFixed(1)}h` },
+    { val: midVal, y: paddingTop + plotHeight / 2, label: `${(midVal / 60).toFixed(1)}h` },
+    { val: 0, y: bottomY, label: '0h' }
+  ];
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${w} ${h}" style="width: 100%; height: 100%; overflow: visible;">
+    <svg viewBox="0 0 ${w} ${h}" style="width: 100%; height: 100%; overflow: visible;" role="img" aria-label="7-Day Productivity Trend Chart">
       <defs>
         <linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#10B981" stop-opacity="0.25"/>
-          <stop offset="100%" stop-color="#10B981" stop-opacity="0.0"/>
+          <stop offset="0%" stop-color="#10B981" stop-opacity="0.30"/>
+          <stop offset="100%" stop-color="#10B981" stop-opacity="0.02"/>
         </linearGradient>
       </defs>
 
-      <!-- Grid lines -->
-      <line x1="${padding}" y1="${h - padding}" x2="${w - padding}" y2="${h - padding}" stroke="var(--card-border)" stroke-width="1"/>
-      <line x1="${padding}" y1="${(h - padding) / 2}" x2="${w - padding}" y2="${(h - padding) / 2}" stroke="var(--card-border)" stroke-width="1" stroke-dasharray="3,3"/>
+      <!-- Y-Axis Ticks & Horizontal Grid lines -->
+      ${yTicks.map((t) => `
+        <line x1="${paddingLeft}" y1="${t.y}" x2="${w - paddingRight}" y2="${t.y}" stroke="var(--card-border)" stroke-width="1" stroke-dasharray="${t.val === 0 ? '0' : '3,3'}" opacity="0.6"/>
+        <text x="${paddingLeft - 8}" y="${t.y + 4}" font-size="10" font-family="var(--font-sans)" fill="var(--text-muted)" text-anchor="end">${t.label}</text>
+      `).join('')}
 
       <!-- Curve area & line -->
       <path d="${areaD}" fill="url(#curveGrad)"/>
       <path d="${pathD}" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round"/>
 
-      <!-- Data Dots & Day Labels -->
-      ${coords.map((c, i) => `
-        <circle cx="${c.x}" cy="${c.y}" r="4" fill="#FFFFFF" stroke="#10B981" stroke-width="2"/>
-        <text x="${c.x}" y="${h - 6}" font-size="10" font-family="var(--font-sans)" fill="var(--text-muted)" text-anchor="middle">${days[i] || ''}</text>
-      `).join('')}
+      <!-- Data Dots, Day Labels & Hover Tooltips -->
+      ${coords.map((c) => {
+        const hours = (c.val / 60).toFixed(1);
+        const tooltip = `${c.day}: ${hours} hrs · ${c.tasks} task${c.tasks === 1 ? '' : 's'}`;
+        const showLabel = c.val > 0;
+        return `
+          <g class="chart-point-group" tabindex="0">
+            <title>${tooltip}</title>
+            <circle cx="${c.x}" cy="${c.y}" r="4.5" fill="#FFFFFF" stroke="#10B981" stroke-width="2.5" style="cursor: pointer; transition: transform 0.15s ease;" />
+            ${showLabel ? `
+              <text x="${c.x}" y="${Math.max(c.y - 8, 12)}" font-size="9" font-weight="700" font-family="var(--font-sans)" fill="var(--brand-emerald)" text-anchor="middle">${hours}h</text>
+            ` : ''}
+            <text x="${c.x}" y="${h - 8}" font-size="10.5" font-family="var(--font-sans)" fill="var(--text-muted)" text-anchor="middle">${c.day}</text>
+          </g>
+        `;
+      }).join('')}
     </svg>
   `;
 }
@@ -3581,12 +3647,28 @@ function renderTaskBreakdownDonut(breakdown) {
   const container = document.getElementById('taskBreakdownDonutContainer');
   if (!container) return;
 
-  const total = breakdown ? (breakdown.total || 0) : 0;
+  const total = breakdown ? (Number(breakdown.total) || 0) : 0;
+  const completed = breakdown ? (Number(breakdown.completed) || 0) : 0;
+  const scheduled = breakdown ? (Number(breakdown.scheduled) || 0) : 0;
+  const missed = breakdown ? (Number(breakdown.missed) || 0) : 0;
+  const unscheduled = breakdown ? (Number(breakdown.unscheduled) || 0) : 0;
+
+  // Update Legend Labels with exact numbers
+  const elComp = document.getElementById('legendCompletedText');
+  const elSched = document.getElementById('legendScheduledText');
+  const elMissed = document.getElementById('legendMissedText');
+  const elUnsched = document.getElementById('legendUnscheduledText');
+  if (elComp) elComp.textContent = `(${completed})`;
+  if (elSched) elSched.textContent = `(${scheduled})`;
+  if (elMissed) elMissed.textContent = `(${missed})`;
+  if (elUnsched) elUnsched.textContent = `(${unscheduled})`;
+
   const size = 160;
   const stroke = 18;
   const radius = (size - stroke) / 2;
   const circ = 2 * Math.PI * radius;
 
+  // When total === 0, show clean neutral slate track
   if (!total || total === 0) {
     container.innerHTML = `
       <div style="position: relative; width: ${size}px; height: ${size}px;">
@@ -3598,7 +3680,7 @@ function renderTaskBreakdownDonut(breakdown) {
           />
         </svg>
         <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
-          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">0 Tasks</span>
+          <span style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">0 / 0</span>
           <span style="font-size: 0.68rem; color: var(--text-muted);">No activity</span>
         </div>
       </div>
@@ -3606,58 +3688,49 @@ function renderTaskBreakdownDonut(breakdown) {
     return;
   }
 
-  // When all tasks are completed, guarantee 100% Emerald Green (#10B981) ring
-  if ((breakdown.completed || 0) >= total && total > 0) {
-    container.innerHTML = `
-      <div style="position: relative; width: ${size}px; height: ${size}px;">
-        <svg width="${size}" height="${size}">
-          <circle cx="${size / 2}" cy="${size / 2}" r="${radius}"
-            fill="transparent"
-            stroke="#10B981"
-            stroke-width="${stroke}"
-          />
-        </svg>
-        <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-          <span style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; color: #10B981;">
-            ${total} / ${total}
-          </span>
-          <span style="font-size: 0.72rem; color: var(--brand-emerald); font-weight: 600;">
-            Completed
-          </span>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  const completedPct = Math.round(((breakdown.completed || 0) / total) * 100);
-  const scheduledPct = Math.round(((breakdown.scheduled || 0) / total) * 100);
-  const missedPct = Math.round(((breakdown.missed || 0) / total) * 100);
-  const unscheduledPct = Math.max(0, 100 - completedPct - scheduledPct - missedPct);
-
   const segments = [
-    { name: 'Completed', pct: completedPct, color: '#10B981' },
-    { name: 'Scheduled', pct: scheduledPct, color: '#06B6D4' },
-    { name: 'Missed', pct: missedPct, color: '#F59E0B' },
-    { name: 'Unscheduled', pct: unscheduledPct, color: '#8B5CF6' }
-  ].filter((s) => s.pct > 0);
+    { name: 'Completed', count: completed, color: '#10B981' },
+    { name: 'Scheduled', count: scheduled, color: '#06B6D4' },
+    { name: 'Missed', count: missed, color: '#F59E0B' },
+    { name: 'Unscheduled', count: unscheduled, color: '#8B5CF6' }
+  ].filter((s) => s.count > 0);
 
-  let currentOffset = 0;
-  const circlesHtml = segments.map((seg) => {
-    const dash = (seg.pct / 100) * circ;
-    const offset = currentOffset;
-    currentOffset -= dash;
-    return `
+  // If exactly 1 category has 100% of tasks, render a single full circle
+  let circlesHtml = '';
+  if (segments.length === 1) {
+    circlesHtml = `
       <circle cx="${size / 2}" cy="${size / 2}" r="${radius}"
         fill="transparent"
-        stroke="${seg.color}"
+        stroke="${segments[0].color}"
         stroke-width="${stroke}"
-        stroke-dasharray="${dash} ${circ - dash}"
-        stroke-dashoffset="${offset}"
-        transform="rotate(-90 ${size / 2} ${size / 2})"
+        data-segment="${segments[0].name}"
+        data-count="${segments[0].count}"
+        data-pct="100"
       />
     `;
-  }).join('');
+  } else {
+    // Proportional segments along 360° ring
+    let accumulatedCirc = 0;
+    circlesHtml = segments.map((seg) => {
+      const fraction = seg.count / total;
+      const dash = fraction * circ;
+      const offset = -accumulatedCirc;
+      accumulatedCirc += dash;
+      return `
+        <circle cx="${size / 2}" cy="${size / 2}" r="${radius}"
+          fill="transparent"
+          stroke="${seg.color}"
+          stroke-width="${stroke}"
+          stroke-dasharray="${dash.toFixed(2)} ${(circ - dash).toFixed(2)}"
+          stroke-dashoffset="${offset.toFixed(2)}"
+          transform="rotate(-90 ${size / 2} ${size / 2})"
+          data-segment="${seg.name}"
+          data-count="${seg.count}"
+          data-pct="${Math.round(fraction * 100)}"
+        />
+      `;
+    }).join('');
+  }
 
   container.innerHTML = `
     <div style="position: relative; width: ${size}px; height: ${size}px;">
@@ -3669,9 +3742,9 @@ function renderTaskBreakdownDonut(breakdown) {
         />
         ${circlesHtml}
       </svg>
-      <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
         <span style="font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">
-          ${breakdown.completed || 0} / ${total}
+          ${completed} / ${total}
         </span>
         <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">
           Completed
@@ -3795,7 +3868,7 @@ function renderProfile(state) {
 
   if (countGoals) countGoals.textContent = state.goals.length;
   if (countTasks) countTasks.textContent = state.metrics.totalCompletedTasks || 0;
-  if (countStreak) countStreak.textContent = `${state.metrics.streak} days`;
+  if (countStreak) countStreak.textContent = `${state.metrics.streak} ${state.metrics.streak === 1 ? 'day' : 'days'}`;
 }
 
 // ==========================================================================

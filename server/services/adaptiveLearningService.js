@@ -30,6 +30,13 @@ function parseLocalDate(raw) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+function getLocalDateString(d = new Date()) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 /**
  * Maps a 24h HH:MM time string to a standard 4-phase time bucket:
  * - morning:   05:00 – 11:59
@@ -596,7 +603,8 @@ function computeGoalForecastSync(db, userId, goalId) {
       remaining_minutes: 0,
       days_left: 0,
       days_needed: 0,
-      burn_rate_mins_day: 0
+      burn_rate_mins_day: 0,
+      projected_completion_date: null
     };
   }
 
@@ -614,7 +622,8 @@ function computeGoalForecastSync(db, userId, goalId) {
       remaining_minutes: 0,
       days_left: 0,
       days_needed: 0,
-      burn_rate_mins_day: 0
+      burn_rate_mins_day: 0,
+      projected_completion_date: getLocalDateString(new Date())
     };
   }
 
@@ -659,6 +668,10 @@ function computeGoalForecastSync(db, userId, goalId) {
     status = 'Behind';
   }
 
+  const projDate = new Date();
+  projDate.setDate(projDate.getDate() + Math.ceil(daysNeeded));
+  const projectedCompletionDate = getLocalDateString(projDate);
+
   return {
     status,
     health: status,
@@ -668,6 +681,7 @@ function computeGoalForecastSync(db, userId, goalId) {
     days_left: daysLeft,
     days_needed: Math.round(daysNeeded * 10) / 10,
     burn_rate_mins_day: Math.round(burnRate),
+    projected_completion_date: projectedCompletionDate,
     a_goal: aGoal,
     v_7day_avg: Math.round(v7dayAvg)
   };
@@ -694,7 +708,8 @@ async function computeGoalForecastAsync(db, userId, goalId) {
       remaining_minutes: 0,
       days_left: 0,
       days_needed: 0,
-      burn_rate_mins_day: 0
+      burn_rate_mins_day: 0,
+      projected_completion_date: null
     };
   }
 
@@ -712,7 +727,8 @@ async function computeGoalForecastAsync(db, userId, goalId) {
       remaining_minutes: 0,
       days_left: 0,
       days_needed: 0,
-      burn_rate_mins_day: 0
+      burn_rate_mins_day: 0,
+      projected_completion_date: getLocalDateString(new Date())
     };
   }
 
@@ -757,6 +773,10 @@ async function computeGoalForecastAsync(db, userId, goalId) {
     status = 'Behind';
   }
 
+  const projDate = new Date();
+  projDate.setDate(projDate.getDate() + Math.ceil(daysNeeded));
+  const projectedCompletionDate = getLocalDateString(projDate);
+
   return {
     status,
     health: status,
@@ -766,6 +786,7 @@ async function computeGoalForecastAsync(db, userId, goalId) {
     days_left: daysLeft,
     days_needed: Math.round(daysNeeded * 10) / 10,
     burn_rate_mins_day: Math.round(burnRate),
+    projected_completion_date: projectedCompletionDate,
     a_goal: aGoal,
     v_7day_avg: Math.round(v7dayAvg)
   };

@@ -147,6 +147,7 @@ async function getInsightsPayload(db, userId) {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const trendDays = [];
   const trendValues = [];
+  const trendTaskCounts = [];
   let trendHasData = false;
 
   for (let i = 6; i >= 0; i--) {
@@ -156,16 +157,32 @@ async function getInsightsPayload(db, userId) {
     const dayLabel = dayNames[targetDate.getDay()];
 
     const dayMinsRow = await db.prepare(`
-      SELECT COALESCE(SUM(actual_minutes), 0) as total
+      SELECT COALESCE(SUM(actual_minutes), 0) as total, COUNT(*) as task_count
       FROM execution_logs
       WHERE user_id = ? AND SUBSTR(logged_at, 1, 10) = ? AND outcome = 'completed'
     `).get(userId, dateStr);
 
     let dayMins = dayMinsRow ? Number(dayMinsRow.total) : 0;
-    if (dayMins > 0) trendHasData = true;
+    let dayTasks = dayMinsRow ? Number(dayMinsRow.task_count) : 0;
+
+    // Fallback: Check completed tasks updated on dateStr if execution_logs didn't record
+    if (dayMins === 0 && dayTasks === 0) {
+      const taskMinsRow = await db.prepare(`
+        SELECT COALESCE(SUM(duration_minutes), 0) as total, COUNT(*) as task_count
+        FROM tasks
+        WHERE user_id = ? AND SUBSTR(updated_at, 1, 10) = ? AND completed = 1
+      `).get(userId, dateStr);
+      if (taskMinsRow && Number(taskMinsRow.task_count) > 0) {
+        dayMins = Number(taskMinsRow.total) || (Number(taskMinsRow.task_count) * 30);
+        dayTasks = Number(taskMinsRow.task_count);
+      }
+    }
+
+    if (dayMins > 0 || dayTasks > 0) trendHasData = true;
 
     trendDays.push(dayLabel);
     trendValues.push(dayMins);
+    trendTaskCounts.push(dayTasks);
   }
 
   // Real Task Breakdown
@@ -177,19 +194,21 @@ async function getInsightsPayload(db, userId) {
   `).get(userId);
   const scheduledIncompleteTasks = scheduledIncompleteRow ? scheduledIncompleteRow.count : 0;
 
-  const missedLogsRow = await db.prepare(`
-    SELECT count(*) as count
-    FROM execution_logs
-    WHERE user_id = ? AND outcome IN ('missed', 'rescheduled')
+  const missedIncompleteRow = await db.prepare(`
+    SELECT count(DISTINCT t.id) as count
+    FROM tasks t
+    WHERE t.user_id = ? AND (t.completed = 0 OR t.completed IS NULL)
+      AND EXISTS (SELECT 1 FROM scheduled_blocks sb WHERE sb.task_id = t.id AND sb.status = 'missed')
+      AND NOT EXISTS (SELECT 1 FROM scheduled_blocks sb WHERE sb.task_id = t.id AND sb.status = 'scheduled')
   `).get(userId);
-  const missedLogsCount = missedLogsRow ? missedLogsRow.count : 0;
+  const missedIncompleteTasks = missedIncompleteRow ? missedIncompleteRow.count : 0;
 
-  const unscheduledTasks = Math.max(0, totalTasks - completedTasks - scheduledIncompleteTasks);
+  const unscheduledTasks = Math.max(0, totalTasks - completedTasks - scheduledIncompleteTasks - missedIncompleteTasks);
 
   const taskBreakdown = {
     completed: completedTasks,
     scheduled: scheduledIncompleteTasks,
-    missed: missedLogsCount,
+    missed: missedIncompleteTasks,
     unscheduled: unscheduledTasks,
     total: totalTasks,
     has_data: totalTasks > 0
@@ -219,6 +238,7 @@ async function getInsightsPayload(db, userId) {
     productivity_trend: {
       days: trendDays,
       values: trendValues,
+      task_counts: trendTaskCounts,
       has_data: trendHasData
     },
     task_breakdown: taskBreakdown,
