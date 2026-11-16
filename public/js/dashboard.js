@@ -51,10 +51,10 @@ const activeActionLocks = new Set();
  * - Disables the button, sets aria-busy="true", preserves original text/HTML, and sets loading label
  * - Restores button state on complete or error
  */
-async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask) {
+async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask, customBusyMessage) {
   if (activeActionLocks.has(lockKey)) {
     if (typeof showToast === 'function') {
-      showToast('Please wait — processing your previous request...', 'info');
+      showToast(customBusyMessage || 'Please wait — processing your previous request...', 'info');
     }
     return;
   }
@@ -195,6 +195,23 @@ window.copyWeekdaysToWeekendsInModal = async function() {
   }
 };
 
+function getInitialView() {
+  const validViews = ['home', 'goals', 'tasks', 'schedule', 'routines', 'insights', 'settings', 'profile'];
+  const rawHash = (window.location.hash || '').replace('#', '').toLowerCase().trim();
+  if (rawHash && validViews.includes(rawHash)) {
+    return rawHash;
+  }
+  return 'home';
+}
+window.getInitialView = getInitialView;
+
+window.addEventListener('hashchange', () => {
+  const targetView = getInitialView();
+  if (Store.state && Store.state.currentView !== targetView && typeof switchView === 'function') {
+    switchView(targetView);
+  }
+});
+
 // Centralized Reactive State Store
 const Store = {
   state: {
@@ -290,10 +307,12 @@ const Store = {
       const cached = JSON.parse(raw);
       if (!cached || !cached.state || !cached.user || !cached.user.id) return false;
 
-      // Hydrate state from cache
+      // Hydrate state from cache, but always enforce initial view (defaults to 'home')
+      const initialView = getInitialView();
       this.state = {
         ...this.state,
         ...cached.state,
+        currentView: initialView,
         user: cached.user
       };
       this.isLoaded = true;
@@ -373,6 +392,8 @@ const Store = {
   // Load initial data from unified bootstrap endpoint
   async init() {
     renderCurrentDateAndGreeting();
+    const initialView = getInitialView();
+    this.state.currentView = initialView;
 
     const cachedUid = localStorage.getItem('ekagra_last_uid') || sessionStorage.getItem('ekagra_last_uid');
     let hasHydratedFromCache = false;
@@ -426,6 +447,7 @@ const Store = {
 
       this.state = {
         ...this.state,
+        currentView: this.state.currentView || initialView,
         user: activeUser,
         isColdStart: isCold,
         goals: initializedGoals,
@@ -1585,7 +1607,7 @@ function renderGoals(state) {
     }
 
     return `
-    <div class="goal-card-full" id="goal-card-${goal.id}">
+    <div class="goal-card-full" id="goal-card-${goal.id}" data-goal-id="${goal.id}">
       <div class="goal-card-header">
         <div class="goal-title-wrap">
           <div class="goal-target-glyph">🎯</div>
@@ -5209,75 +5231,100 @@ window.toggleGoalExpand = function(goalId) {
 window.toggleGoalTasks = window.toggleGoalExpand;
 
 window.handleInlineTaskCreate = async function(event, goalId) {
-  event.preventDefault();
-  const form = event.target;
-  const title = (form.querySelector('.inline-task-title-input')?.value || '').trim();
-  const priority = form.querySelector('.inline-task-prio-select')?.value || 'Medium';
-  const desc = (form.querySelector('.inline-task-desc-input')?.value || '').trim();
-  const duration = parseInt(form.querySelector('.inline-task-duration-input')?.value, 10) || null;
-  const dueDate = form.querySelector('.inline-task-due-input')?.value || null;
+  if (event && event.preventDefault) event.preventDefault();
+  const form = event.target || event.currentTarget;
+  const submitBtn = form?.querySelector('button[type="submit"]') || form?.querySelector('.btn-primary-emerald');
+  const lockKey = `inline-add-task-${goalId}`;
 
-  if (!title) {
-    showToast('Task title is required.', 'error');
-    return;
-  }
+  return withActionLock(lockKey, submitBtn, 'Adding...', async () => {
+    const titleInput = form?.querySelector('.inline-task-title-input');
+    const prioSelect = form?.querySelector('.inline-task-prio-select');
+    const descInput = form?.querySelector('.inline-task-desc-input');
+    const durationInput = form?.querySelector('.inline-task-duration-input');
+    const dueDateInput = form?.querySelector('.inline-task-due-input');
 
-  try {
-    const res = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        goal_id: goalId,
-        description: desc,
-        priority,
-        duration_minutes: duration,
-        due_date: dueDate
-      })
-    });
+    const title = (titleInput?.value || '').trim();
+    const priority = prioSelect?.value || 'Medium';
+    const desc = (descInput?.value || '').trim();
+    const duration = parseInt(durationInput?.value, 10) || null;
+    const dueDate = dueDateInput?.value || null;
 
-    const data = await res.json();
-    if (!res.ok || !data.success || !data.task) {
-      showToast(data.error || 'Failed to create task.', 'error');
+    if (!title) {
+      showToast('Task title is required.', 'error');
+      titleInput?.focus();
       return;
     }
 
-    const newTask = data.task;
-    const updatedTasks = [...(Store.state.tasks || []), newTask];
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          goal_id: goalId,
+          description: desc,
+          priority,
+          duration_minutes: duration,
+          due_date: dueDate
+        })
+      });
 
-    const updatedGoals = (Store.state.goals || []).map((g) => {
-      if (g.id === goalId) {
-        const goalTasks = [...(g.tasks || []), newTask];
-        const total = goalTasks.length;
-        const comp = goalTasks.filter((t) => t.completed).length;
-        const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
-        return {
-          ...g,
-          tasks: goalTasks,
-          totalTasks: total,
-          completedTasks: comp,
-          progress,
-          health: calculateGoalHealth({ ...g, progress })
-        };
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.task) {
+        showToast(data.error || 'Failed to create task.', 'error');
+        return;
       }
-      return g;
-    });
 
-    if (!Store.state.expandedGoals) Store.state.expandedGoals = new Set();
-    Store.state.expandedGoals.add(goalId);
+      const newTask = data.task;
+      const updatedTasks = [...(Store.state.tasks || []), newTask];
 
-    // Dismiss first-task banner upon creating task for this goal
-    localStorage.setItem(`ekagra_first_task_dismissed_${goalId}`, 'true');
-    const banner = document.getElementById('firstTaskBanner');
-    if (banner) banner.style.display = 'none';
+      const updatedGoals = (Store.state.goals || []).map((g) => {
+        if (g.id === goalId) {
+          const goalTasks = [...(g.tasks || []), newTask];
+          const total = goalTasks.length;
+          const comp = goalTasks.filter((t) => t.completed).length;
+          const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
+          return {
+            ...g,
+            tasks: goalTasks,
+            totalTasks: total,
+            completedTasks: comp,
+            progress,
+            health: calculateGoalHealth({ ...g, progress })
+          };
+        }
+        return g;
+      });
 
-    Store.setState({ tasks: updatedTasks, goals: updatedGoals });
-    renderGoals(Store.state);
-    renderHome(Store.state);
-    showToast('Task added to goal.', 'success');
-  } catch (err) {
-    showToast('Network error while adding task.', 'error');
-  }
+      if (!Store.state.expandedGoals) Store.state.expandedGoals = new Set();
+      Store.state.expandedGoals.add(goalId);
+
+      // Dismiss first-task banner upon creating task for this goal
+      localStorage.setItem(`ekagra_first_task_dismissed_${goalId}`, 'true');
+      const banner = document.getElementById('firstTaskBanner');
+      if (banner) banner.style.display = 'none';
+
+      // Clear the inline inputs on success
+      if (form && typeof form.reset === 'function') form.reset();
+      const aiNotice = form?.querySelector('.inline-ai-notice');
+      if (aiNotice) {
+        aiNotice.innerHTML = '';
+        aiNotice.style.display = 'none';
+      }
+      const clarifyBox = form?.querySelector('.inline-ai-clarification-box');
+      if (clarifyBox) {
+        clarifyBox.innerHTML = '';
+        clarifyBox.style.display = 'none';
+      }
+
+      Store.setState({ tasks: updatedTasks, goals: updatedGoals });
+      renderGoals(Store.state);
+      renderHome(Store.state);
+      showToast('Task added to goal.', 'success');
+    } catch (err) {
+      showToast('Network error while adding task.', 'error');
+    }
+  }, 'Please wait — adding task...');
 };
 
 window.toggleTaskCompletion = async function(taskId, goalId) {
@@ -5892,6 +5939,26 @@ window.confirmAiModalChoice = async function() {
 };
 
 // Primary AI Estimate Handler
+window.goToAiSettings = function() {
+  if (typeof closeModal === 'function') {
+    closeModal('newTaskModal');
+    closeModal('editTaskModal');
+    closeModal('aiProviderSelectModal');
+    closeModal('aiKeyModal');
+  }
+  if (typeof switchView === 'function') {
+    switchView('settings');
+  }
+  setTimeout(() => {
+    const card = document.getElementById('aiSettingsCard');
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('highlight-pulse');
+      setTimeout(() => card.classList.remove('highlight-pulse'), 2000);
+    }
+  }, 100);
+};
+
 window.focusManualDurationInput = function(actionBtn) {
   const form = actionBtn?.closest('form') || actionBtn?.closest('.inline-task-create-box') || actionBtn?.closest('.modal-frosted-card') || document;
   const durationInput = form.querySelector('.inline-task-duration-input') || document.getElementById('editTaskDuration') || document.getElementById('wizardTaskDuration');
@@ -5902,15 +5969,15 @@ window.focusManualDurationInput = function(actionBtn) {
 };
 
 window.handleAiEstimateClick = async function(btn, noticeSelector, inputSelector) {
-  if (!btn || btn._isEstimating || btn.disabled) return;
+  if (!btn) return;
 
   const form = btn.closest('form') || btn.closest('.inline-task-create-box') || btn.closest('.modal-frosted-card');
-  const titleInput = form?.querySelector('.inline-task-title-input') || form?.querySelector('#newTaskTitle') || document.getElementById('newTaskTitle') || document.getElementById('editTaskTitle') || document.getElementById('wizardTaskTitle');
-  const descInput = form?.querySelector('.inline-task-desc-input') || form?.querySelector('#newTaskDesc') || document.getElementById('newTaskDesc') || document.getElementById('editTaskDesc');
-  const prioSelect = form?.querySelector('.inline-task-prio-select') || form?.querySelector('#newTaskPriority') || document.getElementById('newTaskPriority') || document.getElementById('editTaskPriority');
+  const titleInput = form?.querySelector('.inline-task-title-input') || (noticeSelector ? document.querySelector('#newTaskTitle, #editTaskTitle') : null) || document.getElementById('newTaskTitle') || document.getElementById('editTaskTitle') || document.getElementById('wizardTaskTitle');
+  const descInput = form?.querySelector('.inline-task-desc-input') || (noticeSelector ? document.querySelector('#newTaskDesc, #editTaskDesc') : null) || document.getElementById('newTaskDesc') || document.getElementById('editTaskDesc');
+  const prioSelect = form?.querySelector('.inline-task-prio-select') || (noticeSelector ? document.querySelector('#newTaskPriority, #editTaskPriority') : null) || document.getElementById('newTaskPriority') || document.getElementById('editTaskPriority');
   const durationInput = inputSelector ? document.querySelector(inputSelector) : (form?.querySelector('.inline-task-duration-input') || document.getElementById('newTaskDuration'));
   const notice = noticeSelector ? document.querySelector(noticeSelector) : (form?.querySelector('.inline-ai-notice') || document.getElementById('newTaskAiNotice'));
-  const clarifyBox = form?.querySelector('.inline-ai-clarification-box') || document.getElementById('newTaskAiClarification') || document.getElementById('editTaskAiClarification');
+  const clarifyBox = form?.querySelector('.inline-ai-clarification-box') || (noticeSelector ? document.querySelector('#newTaskAiClarification, #editTaskAiClarification') : null) || document.getElementById('newTaskAiClarification') || document.getElementById('editTaskAiClarification');
 
   const title = (titleInput?.value || '').trim();
 
@@ -5924,45 +5991,57 @@ window.handleAiEstimateClick = async function(btn, noticeSelector, inputSelector
     return;
   }
 
-  // Set synchronous in-flight lock and immediate loading UI to prevent duplicate clicks
-  btn._isEstimating = true;
-  btn.disabled = true;
-  const originalBtnText = btn.innerHTML;
-  btn.innerHTML = '⏳ Estimating...';
-
-  // 2. Check provider configuration state
-  let settings = window.ekagraAiSettings;
-  if (!settings) {
-    try {
-      settings = await fetchAiSettings();
-    } catch (_) {}
+  // Derive unique action lock key for this button
+  if (!btn._actionLockKey) {
+    btn._actionLockKey = 'ai-estimate-' + (btn.id || (form?.id ? form.id : Math.random().toString(36).substring(2, 9)));
   }
+  const lockKey = btn._actionLockKey;
 
-  if (!settings || (!settings.hasSelection && !settings.isConfigured)) {
-    btn._isEstimating = false;
-    btn.disabled = false;
-    btn.innerHTML = originalBtnText;
-    window.openAiProviderModal(() => {
-      window.handleAiEstimateClick(btn, noticeSelector, inputSelector);
+  return withActionLock(lockKey, btn, 'Estimating...', async () => {
+    // 2. Check provider configuration state
+    let settings = window.ekagraAiSettings;
+    if (!settings) {
+      try {
+        settings = await fetchAiSettings();
+      } catch (_) {}
+    }
+
+    const hasKey = Boolean(settings && settings.hasKey);
+    if (!hasKey) {
+      const missingKeyHtml = `
+        <div class="ai-missing-key-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <span>🔑 Please provide your Gemini API key in Settings → AI Settings to use AI Estimate (or enter duration manually).</span>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn-ai-choice-btn" onclick="goToAiSettings()">Go to AI Settings</button>
+            <button type="button" class="btn-ai-choice-btn secondary" onclick="focusManualDurationInput(this)">Enter Manually</button>
+          </div>
+        </div>
+      `;
+      if (notice) {
+        notice.innerHTML = missingKeyHtml;
+        notice.style.display = 'block';
+      }
+      if (typeof showToast === 'function') {
+        showToast('Please provide your Gemini API key in Settings → AI Settings to use AI Estimate (or enter duration manually).', 'info');
+      }
+      return;
+    }
+
+    // 3. Perform estimation request
+    await executeEstimationRequest({
+      btn,
+      form,
+      title,
+      description: (descInput?.value || '').trim(),
+      priority: prioSelect?.value || 'Medium',
+      clarificationAnswer: null,
+      durationInput,
+      notice,
+      clarifyBox,
+      noticeSelector,
+      inputSelector
     });
-    return;
-  }
-
-  // 3. Perform estimation request
-  await executeEstimationRequest({
-    btn,
-    originalBtnText,
-    form,
-    title,
-    description: (descInput?.value || '').trim(),
-    priority: prioSelect?.value || 'Medium',
-    clarificationAnswer: null,
-    durationInput,
-    notice,
-    clarifyBox,
-    noticeSelector,
-    inputSelector
-  });
+  }, 'Please wait — estimating duration...');
 };
 
 async function executeEstimationRequest({
@@ -6104,12 +6183,19 @@ async function executeEstimationRequest({
     // CASE 3: Provider not configured or error
     if (!data.success) {
       if (notice) {
-        if (data.error_code === 'PROVIDER_NOT_CONFIGURED' || data.error_code === 'MISSING_PERSONAL_KEY' || data.error_code === 'DEFAULT_PROVIDER_NOT_CONFIGURED') {
+        if (data.code === 'API_KEY_MISSING' || data.code === 'NO_API_KEY' || data.error_code === 'PROVIDER_NOT_CONFIGURED' || data.error_code === 'MISSING_PERSONAL_KEY' || data.error_code === 'DEFAULT_PROVIDER_NOT_CONFIGURED') {
           notice.innerHTML = `
-            <span>ℹ️ ${escapeHtml(data.message || 'AI duration estimation requires setup.')}</span>
-            <button type="button" class="btn-ai-choice-btn" style="margin-left: 8px; font-size: 0.74rem;" onclick="openAiProviderModal()">Configure Provider</button>
-            <button type="button" class="btn-ai-choice-btn secondary" style="margin-left: 4px; font-size: 0.74rem;" onclick="focusManualDurationInput(this)">Enter Duration Manually</button>
+            <div class="ai-missing-key-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <span>🔑 Please provide your Gemini API key in Settings → AI Settings to use AI Estimate (or enter duration manually).</span>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-ai-choice-btn" onclick="goToAiSettings()">Go to AI Settings</button>
+                <button type="button" class="btn-ai-choice-btn secondary" onclick="focusManualDurationInput(this)">Enter Manually</button>
+              </div>
+            </div>
           `;
+          if (typeof showToast === 'function') {
+            showToast('Please provide your Gemini API key in Settings → AI Settings to use AI Estimate (or enter duration manually).', 'info');
+          }
         } else if (data.error_code === 'UNSUPPORTED_KEY_TYPE') {
           notice.innerHTML = `
             <span>❌ <strong>Unsupported Key:</strong> ${escapeHtml(data.message)}</span>

@@ -489,11 +489,13 @@ async function estimateTaskDuration({
   const creds = await resolveProviderCredentials(database, userId, userApiKey);
 
   if (!creds || creds.error_code) {
+    const isKeyMissing = !creds || creds.error_code === 'MISSING_PERSONAL_KEY' || creds.error_code === 'PROVIDER_NOT_CONFIGURED' || creds.error_code === 'DEFAULT_PROVIDER_NOT_CONFIGURED';
     return {
       success: false,
       configured: false,
+      code: isKeyMissing ? 'API_KEY_MISSING' : (creds ? creds.error_code : 'PROVIDER_NOT_CONFIGURED'),
       error_code: creds ? creds.error_code : 'PROVIDER_NOT_CONFIGURED',
-      message: creds ? creds.message : 'AI duration estimation is not configured yet. Please configure a provider in Settings.',
+      message: 'Please provide your Gemini API key in Settings to use AI Estimate.',
       needs_clarification: false,
       estimated_minutes: null
     };
