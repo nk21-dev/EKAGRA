@@ -3322,186 +3322,191 @@ function initModals() {
   });
 
   // Goal Form Submission (Add Goal - Zero Category)
+  window.handleAddGoalFormSubmit = async function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const submitBtn = document.getElementById('addGoalSubmitBtn');
+    if (submitBtn && submitBtn.disabled) return;
+
+    const title = document.getElementById('newGoalTitle').value.trim();
+    const target_date = document.getElementById('newGoalDate').value;
+    const desc = document.getElementById('newGoalDesc').value.trim();
+    const selectedPriority = document.querySelector('.goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
+
+    if (!title) {
+      showToast('Goal Name is required.', 'error');
+      return;
+    }
+    if (!target_date) {
+      showToast('Target Date is required.', 'error');
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating...';
+    }
+
+    try {
+      const res = await fetch('/api/goals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          target_date,
+          description: desc,
+          priority: selectedPriority
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.goal) {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Goal';
+        }
+        showToast(data.error || 'Failed to create goal.', 'error');
+        return;
+      }
+
+      const createdGoal = {
+        ...data.goal,
+        deadline: data.goal.target_date,
+        health: data.goal.health || calculateGoalHealth(data.goal)
+      };
+
+      const updatedGoals = [createdGoal, ...Store.state.goals];
+      const newActivity = {
+        id: `a-${Date.now()}`,
+        title: 'Added goal',
+        subtitle: title,
+        time: 'Just now'
+      };
+
+      Store.setState({
+        goals: updatedGoals,
+        isColdStart: false,
+        lastCreatedGoalId: createdGoal.id,
+        scheduleSettings: data.schedule_settings || Store.state.scheduleSettings,
+        activities: [newActivity, ...Store.state.activities.slice(0, 9)]
+      });
+
+      // 1. Immediately switch to Goals view and display the goal in the Goals section
+      switchView('goals');
+      renderGoals(Store.state);
+      renderHome(Store.state);
+
+      // 2. Close the goal creation modal
+      const goalForm = document.getElementById('addGoalForm');
+      if (goalForm) goalForm.reset();
+      window.closeModal('addGoalModal');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Goal';
+      }
+
+      // 3. If routine setup has not been completed or 24-hour routine coverage is incomplete, open routine setup modal
+      if (data.show_routine_setup || data.routine_coverage_incomplete) {
+        Store.setState({ routine_coverage_incomplete: true, is_routine_complete: false });
+        window.openInitialRoutineModal();
+      } else {
+        showToast('Goal created successfully.', 'success');
+        window.checkAndDisplayFirstTaskPrompt(Store.state);
+      }
+    } catch (err) {
+      console.error('Goal creation failed:', err);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Goal';
+      }
+      showToast('Network error while creating goal.', 'error');
+    }
+  };
+
   const goalForm = document.getElementById('addGoalForm');
   if (goalForm) {
-    goalForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const submitBtn = document.getElementById('addGoalSubmitBtn');
-      if (submitBtn && submitBtn.disabled) return;
-
-      const title = document.getElementById('newGoalTitle').value.trim();
-      const target_date = document.getElementById('newGoalDate').value;
-      const desc = document.getElementById('newGoalDesc').value.trim();
-      const selectedPriority = document.querySelector('.goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
-
-      if (!title) {
-        showToast('Goal Name is required.', 'error');
-        return;
-      }
-      if (!target_date) {
-        showToast('Target Date is required.', 'error');
-        return;
-      }
-
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Creating...';
-      }
-
-      try {
-        const res = await fetch('/api/goals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            target_date,
-            description: desc,
-            priority: selectedPriority
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok || !data.success || !data.goal) {
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Create Goal';
-          }
-          showToast(data.error || 'Failed to create goal.', 'error');
-          return;
-        }
-
-        const createdGoal = {
-          ...data.goal,
-          deadline: data.goal.target_date,
-          health: data.goal.health || calculateGoalHealth(data.goal)
-        };
-
-        const updatedGoals = [createdGoal, ...Store.state.goals];
-        const newActivity = {
-          id: `a-${Date.now()}`,
-          title: 'Added goal',
-          subtitle: title,
-          time: 'Just now'
-        };
-
-        Store.setState({
-          goals: updatedGoals,
-          isColdStart: false,
-          lastCreatedGoalId: createdGoal.id,
-          scheduleSettings: data.schedule_settings || Store.state.scheduleSettings,
-          activities: [newActivity, ...Store.state.activities.slice(0, 9)]
-        });
-
-        // 1. Immediately switch to Goals view and display the goal in the Goals section
-        switchView('goals');
-        renderGoals(Store.state);
-        renderHome(Store.state);
-
-        // 2. Close the goal creation modal
-        goalForm.reset();
-        window.closeModal('addGoalModal');
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Create Goal';
-        }
-
-        // 3. If routine setup has not been completed or 24-hour routine coverage is incomplete, open routine setup modal
-        if (data.show_routine_setup || data.routine_coverage_incomplete) {
-          Store.setState({ routine_coverage_incomplete: true, is_routine_complete: false });
-          window.openInitialRoutineModal();
-        } else {
-          showToast('Goal created successfully.', 'success');
-          window.checkAndDisplayFirstTaskPrompt(Store.state);
-        }
-      } catch (err) {
-        console.error('Goal creation failed:', err);
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Create Goal';
-        }
-        showToast('Network error while creating goal.', 'error');
-      }
-    });
+    goalForm.addEventListener('submit', window.handleAddGoalFormSubmit);
   }
 
   // Goal Form Submission (Edit Goal - Zero Category)
+  window.handleEditGoalFormSubmit = async function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const submitBtn = document.getElementById('editGoalSubmitBtn');
+    if (submitBtn && submitBtn.disabled) return;
+
+    const id = document.getElementById('editGoalId').value;
+    const title = document.getElementById('editGoalTitle').value.trim();
+    const target_date = document.getElementById('editGoalDate').value;
+    const desc = document.getElementById('editGoalDesc').value.trim();
+    const selectedPriority = document.querySelector('.edit-goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
+
+    if (!title) {
+      showToast('Goal Name cannot be empty.', 'error');
+      return;
+    }
+    if (!target_date) {
+      showToast('Target Date cannot be empty.', 'error');
+      return;
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+    }
+
+    try {
+      const res = await fetch(`/api/goals/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          target_date,
+          description: desc,
+          priority: selectedPriority
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.goal) {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Save Changes';
+        }
+        showToast(data.error || 'Failed to update goal.', 'error');
+        return;
+      }
+
+      const updated = {
+        ...data.goal,
+        deadline: data.goal.target_date,
+        health: data.goal.health || calculateGoalHealth(data.goal)
+      };
+
+      const updatedGoals = Store.state.goals.map((g) => (g.id === id ? updated : g));
+      Store.setState({ goals: updatedGoals });
+
+      // Immediately update UI without requiring page refresh
+      renderGoals(Store.state);
+      renderHome(Store.state);
+
+      window.closeModal('editGoalModal');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      }
+      showToast('Goal updated successfully.', 'success');
+    } catch (err) {
+      console.error('Goal update failed:', err);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      }
+      showToast('Network error while updating goal.', 'error');
+    }
+  };
+
   const editGoalForm = document.getElementById('editGoalForm');
   if (editGoalForm) {
-    editGoalForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const submitBtn = document.getElementById('editGoalSubmitBtn');
-      if (submitBtn && submitBtn.disabled) return;
-
-      const id = document.getElementById('editGoalId').value;
-      const title = document.getElementById('editGoalTitle').value.trim();
-      const target_date = document.getElementById('editGoalDate').value;
-      const desc = document.getElementById('editGoalDesc').value.trim();
-      const selectedPriority = document.querySelector('.edit-goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
-
-      if (!title) {
-        showToast('Goal Name cannot be empty.', 'error');
-        return;
-      }
-      if (!target_date) {
-        showToast('Target Date cannot be empty.', 'error');
-        return;
-      }
-
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Saving...';
-      }
-
-      try {
-        const res = await fetch(`/api/goals/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
-            target_date,
-            description: desc,
-            priority: selectedPriority
-          })
-        });
-
-        const data = await res.json();
-        if (!res.ok || !data.success || !data.goal) {
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Save Changes';
-          }
-          showToast(data.error || 'Failed to update goal.', 'error');
-          return;
-        }
-
-        const updated = {
-          ...data.goal,
-          deadline: data.goal.target_date,
-          health: data.goal.health || calculateGoalHealth(data.goal)
-        };
-
-        const updatedGoals = Store.state.goals.map((g) => (g.id === id ? updated : g));
-        Store.setState({ goals: updatedGoals });
-
-        // Immediately update UI without requiring page refresh
-        renderGoals(Store.state);
-        renderHome(Store.state);
-
-        window.closeModal('editGoalModal');
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Save Changes';
-        }
-        showToast('Goal updated successfully.', 'success');
-      } catch (err) {
-        console.error('Goal update failed:', err);
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Save Changes';
-        }
-        showToast('Network error while updating goal.', 'error');
-      }
-    });
+    editGoalForm.addEventListener('submit', window.handleEditGoalFormSubmit);
   }
 
   // Delete Goal Confirmation Button
@@ -4485,36 +4490,50 @@ window.skipInitialRoutineSetup = function() {
   window.showFirstTaskNotification();
 };
 
+window.openInitialGapsStep = function() {
+  if (!validateInitialDays()) return;
+  const curGroup = (typeof initialModalActiveGroup !== 'undefined' ? initialModalActiveGroup : 'weekdays');
+  const groupBlocks = initialSetupBlocks.filter((b) => (b.schedule_group || 'weekdays') === curGroup);
+  const coverage = calculateClientDayGaps(groupBlocks);
+
+  const step1 = document.getElementById('initialSetupStep1');
+  const step2 = document.getElementById('initialSetupStep2');
+  const footer1 = document.getElementById('initialSetupFooterStep1');
+  const footer2 = document.getElementById('initialSetupFooterStep2');
+  if (step1) step1.style.display = 'none';
+  if (step2) step2.style.display = 'block';
+  if (footer1) footer1.style.display = 'none';
+  if (footer2) footer2.style.display = 'flex';
+
+  const titleEl = document.getElementById('initialSetupModalTitle');
+  const subEl = document.getElementById('initialSetupModalSubtitle');
+  if (titleEl) titleEl.textContent = "Let's complete your daily routine.";
+  if (subEl) subEl.textContent = "Some parts of your day are still unaccounted for. What do you usually do during these times?";
+
+  renderInitialGapsReview(coverage.gaps);
+};
+
+window.backToInitialStep1 = function() {
+  const step1 = document.getElementById('initialSetupStep1');
+  const step2 = document.getElementById('initialSetupStep2');
+  const footer1 = document.getElementById('initialSetupFooterStep1');
+  const footer2 = document.getElementById('initialSetupFooterStep2');
+  const titleEl = document.getElementById('initialSetupModalTitle');
+  const subEl = document.getElementById('initialSetupModalSubtitle');
+
+  if (step1) step1.style.display = 'block';
+  if (step2) step2.style.display = 'none';
+  if (footer1) footer1.style.display = 'flex';
+  if (footer2) footer2.style.display = 'none';
+  if (titleEl) titleEl.textContent = 'Set Up Your Daily Routine';
+  if (subEl) subEl.textContent = "Tell EKAGRA when you're busy so we can understand when you are available for your tasks.";
+};
+
 window.saveInitialRoutineSetup = async function() {
   const errEl = document.getElementById('initialSetupErrorAlert');
   const msgEl = document.getElementById('initialSetupErrorMsg');
 
   if (!validateInitialDays()) {
-    return;
-  }
-
-  // Calculate gaps for the active group in initialSetupBlocks
-  const curGroup = (typeof initialModalActiveGroup !== 'undefined' ? initialModalActiveGroup : 'weekdays');
-  const groupBlocks = initialSetupBlocks.filter((b) => (b.schedule_group || 'weekdays') === curGroup);
-  const coverage = calculateClientDayGaps(groupBlocks);
-
-  // If on step 1 and gaps exist, transition to follow-up Step 2 to classify uncovered intervals
-  const step1 = document.getElementById('initialSetupStep1');
-  const step2 = document.getElementById('initialSetupStep2');
-  if (step1 && step1.style.display !== 'none' && !coverage.is_full_day_covered && initialSetupBlocks.length > 0) {
-    step1.style.display = 'none';
-    if (step2) step2.style.display = 'block';
-    const footer1 = document.getElementById('initialSetupFooterStep1');
-    const footer2 = document.getElementById('initialSetupFooterStep2');
-    if (footer1) footer1.style.display = 'none';
-    if (footer2) footer2.style.display = 'flex';
-
-    const titleEl = document.getElementById('initialSetupModalTitle');
-    const subEl = document.getElementById('initialSetupModalSubtitle');
-    if (titleEl) titleEl.textContent = "Let's complete your daily routine.";
-    if (subEl) subEl.textContent = "Some parts of your day are still unaccounted for. What do you usually do during these times?";
-
-    renderInitialGapsReview(coverage.gaps);
     return;
   }
 
@@ -4565,12 +4584,27 @@ async function executeSaveInitialSetup(isCompleting) {
 
     Store.setState({
       scheduleSettings: data.settings,
-      routines: [...(Store.state.routines || []), ...(data.routines || [])]
+      routines: data.routines || [],
+      routine_coverage_incomplete: false,
+      is_routine_complete: true,
+      needs_routine_setup: false
     });
 
+    const banner = document.getElementById('globalRoutineIncompleteBanner');
+    if (banner) {
+      banner.style.display = 'none';
+    }
+    if (typeof window.updateGlobalRoutineBanner === 'function') {
+      window.updateGlobalRoutineBanner(Store.state);
+    }
+
     window.closeModal('initialRoutineModal');
-    renderGoals(Store.state);
-    renderRoutines(Store.state);
+    if (typeof renderGoals === 'function') renderGoals(Store.state);
+    if (typeof renderRoutines === 'function') renderRoutines(Store.state);
+    if (typeof renderScheduleCalendar === 'function') renderScheduleCalendar(Store.state);
+    if (typeof renderInsights === 'function') renderInsights(Store.state);
+    if (typeof updateDashboardCards === 'function') updateDashboardCards(Store.state);
+
     showToast(isCompleting ? 'Routine saved successfully!' : 'Routine progress saved! You can complete your remaining schedule anytime in Routines.', 'success');
     window.showFirstTaskNotification();
   } catch (e) {

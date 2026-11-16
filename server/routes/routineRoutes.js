@@ -178,14 +178,6 @@ router.post('/initial-setup', requireAuth, async (req, res) => {
           days: groupDays
         };
 
-        // Check against existing routines in database
-        const conflict = await checkRoutineOverlap(db, userId, blockData);
-        if (conflict && conflict.hasOverlap) {
-          return res.status(409).json({
-            error: conflict.message || `Routine "${name}" overlaps with an existing routine.`
-          });
-        }
-
         // Check against other blocks in the same batch
         const blockIntervals = getBlockIntervals(blockData, groupDays);
         for (const prev of validBlocks) {
@@ -212,7 +204,11 @@ router.post('/initial-setup', requireAuth, async (req, res) => {
       }
     }
 
-    // 3. Atomically insert all valid routine blocks
+    // 3. Atomically replace routine blocks for this user
+    if (Array.isArray(routines)) {
+      await db.prepare('DELETE FROM routines WHERE user_id = ?').run(userId);
+    }
+
     const insertedRoutines = [];
     for (const b of validBlocks) {
       const routineId = `r-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;

@@ -3047,6 +3047,12 @@ body {
   transition: all 0.2s ease;
   text-align: center;
   box-shadow: var(--card-shadow);
+  color: var(--text-primary);
+}
+
+.routine-group-tab-btn .routine-group-tab-title,
+.routine-group-tab-btn div:first-child {
+  color: var(--text-primary);
 }
 
 .routine-group-tab-btn:hover {
@@ -3057,6 +3063,12 @@ body {
   background: rgba(16, 185, 129, 0.08);
   border-color: var(--brand-emerald);
   box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+  color: var(--brand-emerald);
+}
+
+.routine-group-tab-btn.active .routine-group-tab-title,
+.routine-group-tab-btn.active div:first-child {
+  color: var(--brand-emerald);
 }
 
 .routine-group-tab-title {
@@ -4049,11 +4061,23 @@ body {
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
+  color: var(--text-primary);
+}
+
+.modal-routine-tabs-row .routine-group-tab-btn .routine-group-tab-title,
+.modal-routine-tabs-row .routine-group-tab-btn div:first-child {
+  color: var(--text-primary);
 }
 
 .modal-routine-tabs-row .routine-group-tab-btn.active {
   border-color: var(--brand-emerald);
-  background: rgba(16, 185, 129, 0.08);
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--brand-emerald);
+}
+
+.modal-routine-tabs-row .routine-group-tab-btn.active .routine-group-tab-title,
+.modal-routine-tabs-row .routine-group-tab-btn.active div:first-child {
+  color: var(--brand-emerald);
 }
 
 /* Unscheduled Queue Container on Schedule Page */

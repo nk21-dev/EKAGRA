@@ -388,10 +388,10 @@
         <!-- Schedule Navigation Controls -->
         <div class="schedule-header-controls">
           <div class="schedule-date-navigator">
-            <button type="button" class="btn-arrow-nav" onclick="navigateScheduleDay(-1)">‹</button>
+            <button type="button" class="btn-arrow-nav" id="schedulePrevDayBtn" onclick="navigateScheduleDay(-1)">‹</button>
             <span class="current-date-title" id="scheduleCurrentDateTitle">Tue, 8 Apr 2026</span>
-            <button type="button" class="btn-arrow-nav" onclick="navigateScheduleDay(1)">›</button>
-            <button type="button" class="btn-secondary-pill" onclick="snapScheduleToday()">Today</button>
+            <button type="button" class="btn-arrow-nav" id="scheduleNextDayBtn" onclick="navigateScheduleDay(1)">›</button>
+            <button type="button" class="btn-secondary-pill" id="scheduleTodayBtn" onclick="snapScheduleToday()">Today</button>
           </div>
 
           <div style="display: flex; gap: 10px; align-items: center;">
@@ -695,7 +695,7 @@
       <h3 class="modal-title-lg" style="margin-bottom: 4px;">Create New Goal</h3>
       <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 18px;">Set a meaningful goal to anchor your focused execution.</p>
 
-      <form id="addGoalForm" class="modal-form-stack">
+      <form id="addGoalForm" class="modal-form-stack" onsubmit="handleAddGoalFormSubmit(event); return false;">
         <div class="modal-field-group">
           <label class="modal-label">Goal Name *</label>
           <input type="text" id="newGoalTitle" class="modal-input" placeholder="e.g. Prepare for AI/ML Internship" required>
@@ -750,11 +750,11 @@
         <!-- Routine Group Switcher Tabs & Live 24h Coverage Meter -->
         <div class="modal-routine-tabs-row" style="display: flex; gap: 10px; margin-top: 14px;">
           <button type="button" class="routine-group-tab-btn active" id="modalTabWeekdays" style="flex: 1; padding: 8px 12px;" onclick="switchModalRoutineGroup('weekdays')">
-            <div style="font-weight: 700; font-size: 0.88rem;">Weekdays</div>
+            <div class="routine-group-tab-title" style="font-weight: 700; font-size: 0.88rem; color: var(--text-primary);">Weekdays</div>
             <div style="font-size: 0.74rem; color: var(--text-secondary);" id="modalCovPillWeekdays">0h / 24h</div>
           </button>
           <button type="button" class="routine-group-tab-btn" id="modalTabWeekends" style="flex: 1; padding: 8px 12px;" onclick="switchModalRoutineGroup('weekends')">
-            <div style="font-weight: 700; font-size: 0.88rem;">Weekends</div>
+            <div class="routine-group-tab-title" style="font-weight: 700; font-size: 0.88rem; color: var(--text-primary);">Weekends</div>
             <div style="font-size: 0.74rem; color: var(--text-secondary);" id="modalCovPillWeekends">0h / 24h</div>
           </button>
         </div>
@@ -900,13 +900,15 @@
         <!-- Footer for Step 1 -->
         <div class="modal-actions-row" id="initialSetupFooterStep1">
           <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="skipInitialRoutineSetup()">Skip for Now</button>
-          <button type="button" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="saveInitialRoutineSetup()">Save Routine</button>
+          <button type="button" class="btn-secondary-pill" id="reviewInitialGapsBtn" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="openInitialGapsStep()">Review Gaps</button>
+          <button type="button" class="btn-primary-emerald" id="saveInitialRoutineBtn" style="flex: 1.2; border-radius: 12px; padding: 12px;" onclick="saveInitialRoutineSetup()">Save Routine</button>
         </div>
 
         <!-- Footer for Step 2 -->
         <div class="modal-actions-row" id="initialSetupFooterStep2" style="display: none;">
+          <button type="button" class="btn-secondary-pill" style="padding: 12px;" onclick="backToInitialStep1()">← Back</button>
           <button type="button" class="btn-secondary-pill" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="saveInitialRoutineProgress()">Save Progress & Finish Later</button>
-          <button type="button" class="btn-primary-emerald" style="flex: 1; border-radius: 12px; padding: 12px;" onclick="finishInitialRoutineSetup()">Save & Complete Routine</button>
+          <button type="button" class="btn-primary-emerald" id="finishInitialRoutineBtn" style="flex: 1.2; border-radius: 12px; padding: 12px;" onclick="finishInitialRoutineSetup()">Save & Complete Routine</button>
         </div>
       </div>
     </div>
@@ -954,7 +956,7 @@
       <button type="button" class="modal-close-btn" onclick="closeModal('editGoalModal')">✕</button>
       <h3 class="modal-title-lg">Edit Goal</h3>
 
-      <form id="editGoalForm" class="modal-form-stack">
+      <form id="editGoalForm" class="modal-form-stack" onsubmit="handleEditGoalFormSubmit(event); return false;">
         <input type="hidden" id="editGoalId">
         <div class="modal-field-group">
           <label class="modal-label">Goal Name *</label>
