@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const LATEST_SCHEMA_VERSION = 12;
+const LATEST_SCHEMA_VERSION = 13;
 
 function checkSchemaVersionSync(db) {
   try {
@@ -469,6 +469,24 @@ function runMigrationsSync(db) {
     console.error('[Migration 012 deduplicate scheduled blocks error]', err);
   }
 
+  // Migration 013: Deduplicate routines per (user_id, schedule_group)
+  try {
+    db.prepare(`
+      DELETE FROM routines
+      WHERE id NOT IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY user_id, schedule_group, start_time, end_time 
+            ORDER BY created_at ASC, id ASC
+          ) as rn
+          FROM routines
+        ) WHERE rn = 1
+      )
+    `).run();
+  } catch (err) {
+    console.error('[Migration 013 deduplicate routines error]', err);
+  }
+
   // Record schema version in metadata table
   recordSchemaVersionSync(db);
 
@@ -883,6 +901,24 @@ async function runMigrationsAsync(db) {
     `).run();
   } catch (err) {
     console.error('[Migration 012 deduplicate scheduled blocks error]', err);
+  }
+
+  // Migration 013: Deduplicate routines per (user_id, schedule_group)
+  try {
+    await db.prepare(`
+      DELETE FROM routines
+      WHERE id NOT IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY user_id, schedule_group, start_time, end_time 
+            ORDER BY created_at ASC, id ASC
+          ) as rn
+          FROM routines
+        ) WHERE rn = 1
+      )
+    `).run();
+  } catch (err) {
+    console.error('[Migration 013 deduplicate routines error]', err);
   }
 
   // Record schema version in metadata table

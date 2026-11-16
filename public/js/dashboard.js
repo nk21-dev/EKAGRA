@@ -42,6 +42,63 @@ function getLocalDateString(d = new Date()) {
 
 let scheduleFetchId = 0;
 
+const activeActionLocks = new Set();
+
+/**
+ * Universal Action Lock for Mutation Buttons
+ * - Prevents multiple clicks / race conditions across all views & modals
+ * - Displays toast "Please wait — processing your previous request..." on duplicate click
+ * - Disables the button, sets aria-busy="true", preserves original text/HTML, and sets loading label
+ * - Restores button state on complete or error
+ */
+async function withActionLock(lockKey, buttonOrSelector, loadingLabel, asyncTask) {
+  if (activeActionLocks.has(lockKey)) {
+    if (typeof showToast === 'function') {
+      showToast('Please wait — processing your previous request...', 'info');
+    }
+    return;
+  }
+
+  activeActionLocks.add(lockKey);
+
+  let btn = null;
+  if (typeof buttonOrSelector === 'string') {
+    btn = document.querySelector(buttonOrSelector);
+  } else if (buttonOrSelector && buttonOrSelector.nodeType === 1) {
+    btn = buttonOrSelector;
+  }
+
+  let originalHtml = null;
+  let originalDisabled = false;
+
+  if (btn) {
+    originalHtml = btn.innerHTML;
+    originalDisabled = btn.disabled;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.classList.add('btn-action-locked');
+    if (loadingLabel) {
+      btn.innerHTML = `<span class="btn-spinner"></span> ${loadingLabel}`;
+    }
+  }
+
+  try {
+    return await asyncTask();
+  } finally {
+    activeActionLocks.delete(lockKey);
+    if (btn) {
+      btn.disabled = originalDisabled;
+      btn.removeAttribute('aria-busy');
+      btn.classList.remove('btn-action-locked');
+      if (originalHtml !== null) {
+        btn.innerHTML = originalHtml;
+      }
+    }
+  }
+}
+
+window.withActionLock = withActionLock;
+
 window.updateGlobalRoutineBanner = function(state) {
   const banner = document.getElementById('globalRoutineIncompleteBanner');
   if (!banner) return;
@@ -83,27 +140,37 @@ window.updateGlobalRoutineBanner = function(state) {
 };
 
 window.copyWeekdaysToWeekends = async function() {
-  try {
-    const res = await fetch('/api/routines/copy-group', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fromGroup: 'weekdays', toGroup: 'weekends' })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      showToast(data.error || 'Failed to copy routine', 'error');
-      return;
+  const btn = document.getElementById('btnCopyWeekdaysToWeekends') || document.querySelector('[onclick="copyWeekdaysToWeekends()"]');
+  return withActionLock('copyWeekdaysToWeekends', btn, 'Copying...', async () => {
+    try {
+      const res = await fetch('/api/routines/copy-group', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromGroup: 'weekdays', toGroup: 'weekends' })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to copy routine', 'error');
+        return;
+      }
+      showToast(data.message || 'Copied weekdays routine to weekends!', 'success');
+      if (data.routines) {
+        Store.setState({
+          routines: data.routines,
+          routine_coverage_incomplete: data.coverage_status ? !data.coverage_status.is_routine_complete : false
+        });
+      } else {
+        await Store.init();
+      }
+      if (Store.state.currentView === 'routines') {
+        renderRoutines(Store.state);
+      }
+      window.updateGlobalRoutineBanner(Store.state);
+    } catch (err) {
+      console.error('Copy weekdays error:', err);
+      showToast('Failed to copy weekdays routine.', 'error');
     }
-    showToast(data.message || 'Copied weekdays routine to weekends!', 'success');
-    await Store.init();
-    if (Store.state.currentView === 'routines') {
-      renderRoutines(Store.state);
-    }
-    window.updateGlobalRoutineBanner(Store.state);
-  } catch (err) {
-    console.error('Copy weekdays error:', err);
-    showToast('Failed to copy weekdays routine.', 'error');
-  }
+  });
 };
 
 window.copyWeekdaysToWeekendsInModal = async function() {
@@ -883,10 +950,12 @@ window.submitQuickCheckIn = async function(isVerified) {
   const inputEl = document.getElementById('quickCheckInMinutesInput');
   const actualMinutes = isVerified ? Math.max(1, parseInt(inputEl?.value, 10) || estMins) : estMins;
 
-  window.closeModal('quickCheckInModal');
-  activeCheckInTask = null;
-
-  await window.handleHomeCompleteNextTask(taskId, actualMinutes, Boolean(isVerified));
+  const btn = isVerified ? document.querySelector('#quickCheckInModal .btn-primary-emerald') : document.querySelector('#quickCheckInModal .btn-secondary-pill');
+  return withActionLock('submitQuickCheckIn', btn, isVerified ? 'Saving...' : 'Skipping...', async () => {
+    window.closeModal('quickCheckInModal');
+    activeCheckInTask = null;
+    await window.handleHomeCompleteNextTask(taskId, actualMinutes, Boolean(isVerified));
+  });
 };
 
 window.handleTaskCheckboxClick = function(taskId, goalId) {
@@ -901,68 +970,72 @@ window.handleTaskCheckboxClick = function(taskId, goalId) {
 };
 
 window.handleHomeCompleteNextTask = async function(taskId, actualMinutes = null, durationVerified = true) {
-  if (isTaskActionInFlight) return;
-  isTaskActionInFlight = true;
-  try {
-    const payload = { taskId };
-    if (actualMinutes !== null && actualMinutes !== undefined) {
-      payload.actualMinutes = actualMinutes;
-      payload.duration_verified = Boolean(durationVerified);
+  return withActionLock('task_action_' + taskId, null, null, async () => {
+    if (isTaskActionInFlight) return;
+    isTaskActionInFlight = true;
+    try {
+      const payload = { taskId };
+      if (actualMinutes !== null && actualMinutes !== undefined) {
+        payload.actualMinutes = actualMinutes;
+        payload.duration_verified = Boolean(durationVerified);
+      }
+      const res = await fetch('/api/schedule/complete-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Task marked completed! Pace calibrated.', 'success');
+        await Store.loadTodaySchedule();
+        await Store.init();
+        if (Store.state.currentView === 'home') renderHome(Store.state);
+        if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
+        if (Store.state.currentView === 'insights') renderInsights(Store.state);
+        if (Store.state.currentView === 'goals') renderGoals(Store.state);
+        if (Store.state.currentView === 'tasks') renderTasks(Store.state);
+      } else {
+        showToast(data.error || 'Failed to complete task.', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to complete task.', 'error');
+    } finally {
+      isTaskActionInFlight = false;
     }
-    const res = await fetch('/api/schedule/complete-task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      showToast('Task marked completed! Pace calibrated.', 'success');
-      await Store.loadTodaySchedule();
-      await Store.init();
-      if (Store.state.currentView === 'home') renderHome(Store.state);
-      if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
-      if (Store.state.currentView === 'insights') renderInsights(Store.state);
-      if (Store.state.currentView === 'goals') renderGoals(Store.state);
-      if (Store.state.currentView === 'tasks') renderTasks(Store.state);
-    } else {
-      showToast(data.error || 'Failed to complete task.', 'error');
-    }
-  } catch (err) {
-    showToast('Failed to complete task.', 'error');
-  } finally {
-    isTaskActionInFlight = false;
-  }
+  });
 };
 
 window.handleHomeRescheduleNextTask = async function(taskId) {
-  if (isTaskActionInFlight) return;
-  isTaskActionInFlight = true;
-  try {
-    const res = await fetch('/api/schedule/reschedule-task', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId })
-    });
-    const data = await res.json();
-    if (res.ok && data.success) {
-      const targetDate = data.scheduled_date || data.date;
-      const targetTime = (typeof formatTime12Hour === 'function' && data.start_time) ? formatTime12Hour(data.start_time) : (data.start_time || '');
-      showToast(`Task rescheduled for ${targetDate}${targetTime ? ' at ' + targetTime : ''}.`, 'success');
-      await Store.loadTodaySchedule();
-      await Store.init();
-      if (Store.state.currentView === 'home') renderHome(Store.state);
-      if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
-      if (Store.state.currentView === 'insights') renderInsights(Store.state);
-      if (Store.state.currentView === 'goals') renderGoals(Store.state);
-      if (Store.state.currentView === 'tasks') renderTasks(Store.state);
-    } else {
-      showToast(data.error || 'Failed to reschedule task', 'error');
+  return withActionLock('task_action_' + taskId, null, null, async () => {
+    if (isTaskActionInFlight) return;
+    isTaskActionInFlight = true;
+    try {
+      const res = await fetch('/api/schedule/reschedule-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const targetDate = data.scheduled_date || data.date;
+        const targetTime = (typeof formatTime12Hour === 'function' && data.start_time) ? formatTime12Hour(data.start_time) : (data.start_time || '');
+        showToast(`Task rescheduled for ${targetDate}${targetTime ? ' at ' + targetTime : ''}.`, 'success');
+        await Store.loadTodaySchedule();
+        await Store.init();
+        if (Store.state.currentView === 'home') renderHome(Store.state);
+        if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
+        if (Store.state.currentView === 'insights') renderInsights(Store.state);
+        if (Store.state.currentView === 'goals') renderGoals(Store.state);
+        if (Store.state.currentView === 'tasks') renderTasks(Store.state);
+      } else {
+        showToast(data.error || 'Failed to reschedule task', 'error');
+      }
+    } catch (err) {
+      showToast('Failed to reschedule task', 'error');
+    } finally {
+      isTaskActionInFlight = false;
     }
-  } catch (err) {
-    showToast('Failed to reschedule task', 'error');
-  } finally {
-    isTaskActionInFlight = false;
-  }
+  });
 };
 
 function renderHome(state) {
@@ -2270,7 +2343,6 @@ async function renderSchedule(state) {
 }
 
 window.triggerAutoSchedule = async function() {
-  if (isTaskActionInFlight) return;
   if (Store.state.routine_coverage_incomplete) {
     const msg = Store.state.routine_warning_message || 
       (Store.state.routine_coverage_status && Store.state.routine_coverage_status.message) ||
@@ -2282,49 +2354,53 @@ window.triggerAutoSchedule = async function() {
     return;
   }
 
-  isTaskActionInFlight = true;
-  showToast('Generating priority schedule...', 'info');
-  try {
-    const res = await fetch('/api/schedule/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ daysAhead: 7, clearExisting: false })
-    });
-    const data = await res.json();
-    if (data.routine_coverage_incomplete) {
-      Store.setState({
-        routine_coverage_incomplete: true,
-        is_routine_complete: false,
-        incomplete_group: data.incomplete_group,
-        routine_warning_message: data.message
+  const activeBtn = document.getElementById('homeAutoScheduleBtn') || document.querySelector('[onclick="triggerAutoSchedule()"]');
+  return withActionLock('triggerAutoSchedule', activeBtn, 'Scheduling...', async () => {
+    if (isTaskActionInFlight) return;
+    isTaskActionInFlight = true;
+    showToast('Generating priority schedule...', 'info');
+    try {
+      const res = await fetch('/api/schedule/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daysAhead: 7, clearExisting: false })
       });
-      window.updateGlobalRoutineBanner(Store.state);
-      showToast(data.message || 'Without your full 24-hour schedule, EKAGRA cannot know when you are free vs. busy to schedule your goals.', 'warning');
-      window.openInitialRoutineModal(true);
-      return;
+      const data = await res.json();
+      if (data.routine_coverage_incomplete) {
+        Store.setState({
+          routine_coverage_incomplete: true,
+          is_routine_complete: false,
+          incomplete_group: data.incomplete_group,
+          routine_warning_message: data.message
+        });
+        window.updateGlobalRoutineBanner(Store.state);
+        showToast(data.message || 'Without your full 24-hour schedule, EKAGRA cannot know when you are free vs. busy to schedule your goals.', 'warning');
+        window.openInitialRoutineModal(true);
+        return;
+      }
+      if (data.success) {
+        showToast(data.message || 'Auto-scheduled goals successfully!', 'success');
+        await Store.loadTodaySchedule();
+        await Store.init();
+        if (Store.state.currentView === 'schedule') {
+          renderSchedule(Store.state);
+        }
+        if (Store.state.currentView === 'home') {
+          renderHome(Store.state);
+        }
+        if (Store.state.currentView === 'tasks') {
+          renderTasks(Store.state);
+        }
+      } else {
+        showToast(data.message || data.error || 'Could not schedule tasks.', 'error');
+      }
+    } catch (err) {
+      console.error('Auto-schedule network error:', err);
+      showToast('Network error while generating schedule.', 'error');
+    } finally {
+      isTaskActionInFlight = false;
     }
-    if (data.success) {
-      showToast(data.message || 'Auto-scheduled goals successfully!', 'success');
-      await Store.loadTodaySchedule();
-      await Store.init();
-      if (Store.state.currentView === 'schedule') {
-        renderSchedule(Store.state);
-      }
-      if (Store.state.currentView === 'home') {
-        renderHome(Store.state);
-      }
-      if (Store.state.currentView === 'tasks') {
-        renderTasks(Store.state);
-      }
-    } else {
-      showToast(data.message || data.error || 'Could not schedule tasks.', 'error');
-    }
-  } catch (err) {
-    console.error('Auto-schedule network error:', err);
-    showToast('Network error while generating schedule.', 'error');
-  } finally {
-    isTaskActionInFlight = false;
-  }
+  });
 };
 
 window.completeScheduledBlock = async function(taskId) {
@@ -3325,101 +3401,84 @@ function initModals() {
   window.handleAddGoalFormSubmit = async function(e) {
     if (e && e.preventDefault) e.preventDefault();
     const submitBtn = document.getElementById('addGoalSubmitBtn');
-    if (submitBtn && submitBtn.disabled) return;
+    return withActionLock('addGoal', submitBtn, 'Creating...', async () => {
+      const title = document.getElementById('newGoalTitle').value.trim();
+      const target_date = document.getElementById('newGoalDate').value;
+      const desc = document.getElementById('newGoalDesc').value.trim();
+      const selectedPriority = document.querySelector('.goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
 
-    const title = document.getElementById('newGoalTitle').value.trim();
-    const target_date = document.getElementById('newGoalDate').value;
-    const desc = document.getElementById('newGoalDesc').value.trim();
-    const selectedPriority = document.querySelector('.goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
-
-    if (!title) {
-      showToast('Goal Name is required.', 'error');
-      return;
-    }
-    if (!target_date) {
-      showToast('Target Date is required.', 'error');
-      return;
-    }
-
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating...';
-    }
-
-    try {
-      const res = await fetch('/api/goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          target_date,
-          description: desc,
-          priority: selectedPriority
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.goal) {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Create Goal';
-        }
-        showToast(data.error || 'Failed to create goal.', 'error');
+      if (!title) {
+        showToast('Goal Name is required.', 'error');
+        return;
+      }
+      if (!target_date) {
+        showToast('Target Date is required.', 'error');
         return;
       }
 
-      const createdGoal = {
-        ...data.goal,
-        deadline: data.goal.target_date,
-        health: data.goal.health || calculateGoalHealth(data.goal)
-      };
+      try {
+        const res = await fetch('/api/goals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            target_date,
+            description: desc,
+            priority: selectedPriority
+          })
+        });
 
-      const updatedGoals = [createdGoal, ...Store.state.goals];
-      const newActivity = {
-        id: `a-${Date.now()}`,
-        title: 'Added goal',
-        subtitle: title,
-        time: 'Just now'
-      };
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.goal) {
+          showToast(data.error || 'Failed to create goal.', 'error');
+          return;
+        }
 
-      Store.setState({
-        goals: updatedGoals,
-        isColdStart: false,
-        lastCreatedGoalId: createdGoal.id,
-        scheduleSettings: data.schedule_settings || Store.state.scheduleSettings,
-        activities: [newActivity, ...Store.state.activities.slice(0, 9)]
-      });
+        const createdGoal = {
+          ...data.goal,
+          deadline: data.goal.target_date,
+          health: data.goal.health || calculateGoalHealth(data.goal)
+        };
 
-      // 1. Immediately switch to Goals view and display the goal in the Goals section
-      switchView('goals');
-      renderGoals(Store.state);
-      renderHome(Store.state);
+        const updatedGoals = [createdGoal, ...Store.state.goals];
+        const newActivity = {
+          id: `a-${Date.now()}`,
+          title: 'Added goal',
+          subtitle: title,
+          time: 'Just now'
+        };
 
-      // 2. Close the goal creation modal
-      const goalForm = document.getElementById('addGoalForm');
-      if (goalForm) goalForm.reset();
-      window.closeModal('addGoalModal');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Goal';
+        Store.setState({
+          goals: updatedGoals,
+          isColdStart: false,
+          lastCreatedGoalId: createdGoal.id,
+          scheduleSettings: data.schedule_settings || Store.state.scheduleSettings,
+          activities: [newActivity, ...Store.state.activities.slice(0, 9)]
+        });
+
+        // 1. Immediately switch to Goals view and display the goal in the Goals section
+        switchView('goals');
+        renderGoals(Store.state);
+        renderHome(Store.state);
+
+        // 2. Close the goal creation modal
+        const goalForm = document.getElementById('addGoalForm');
+        if (goalForm) goalForm.reset();
+        window.closeModal('addGoalModal');
+
+        // 3. If routine setup has not been completed or 24-hour routine coverage is incomplete, open routine setup modal
+        if (data.show_routine_setup || data.routine_coverage_incomplete) {
+          Store.setState({ routine_coverage_incomplete: true, is_routine_complete: false });
+          window.openInitialRoutineModal();
+        } else {
+          showToast('Goal created successfully.', 'success');
+          window.checkAndDisplayFirstTaskPrompt(Store.state);
+        }
+      } catch (err) {
+        console.error('Goal creation failed:', err);
+        showToast('Network error while creating goal.', 'error');
       }
-
-      // 3. If routine setup has not been completed or 24-hour routine coverage is incomplete, open routine setup modal
-      if (data.show_routine_setup || data.routine_coverage_incomplete) {
-        Store.setState({ routine_coverage_incomplete: true, is_routine_complete: false });
-        window.openInitialRoutineModal();
-      } else {
-        showToast('Goal created successfully.', 'success');
-        window.checkAndDisplayFirstTaskPrompt(Store.state);
-      }
-    } catch (err) {
-      console.error('Goal creation failed:', err);
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Goal';
-      }
-      showToast('Network error while creating goal.', 'error');
-    }
+    });
   };
 
   const goalForm = document.getElementById('addGoalForm');
@@ -3431,77 +3490,60 @@ function initModals() {
   window.handleEditGoalFormSubmit = async function(e) {
     if (e && e.preventDefault) e.preventDefault();
     const submitBtn = document.getElementById('editGoalSubmitBtn');
-    if (submitBtn && submitBtn.disabled) return;
+    return withActionLock('editGoal', submitBtn, 'Saving...', async () => {
+      const id = document.getElementById('editGoalId').value;
+      const title = document.getElementById('editGoalTitle').value.trim();
+      const target_date = document.getElementById('editGoalDate').value;
+      const desc = document.getElementById('editGoalDesc').value.trim();
+      const selectedPriority = document.querySelector('.edit-goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
 
-    const id = document.getElementById('editGoalId').value;
-    const title = document.getElementById('editGoalTitle').value.trim();
-    const target_date = document.getElementById('editGoalDate').value;
-    const desc = document.getElementById('editGoalDesc').value.trim();
-    const selectedPriority = document.querySelector('.edit-goal-priority-btn.selected')?.getAttribute('data-prio') || 'Medium';
-
-    if (!title) {
-      showToast('Goal Name cannot be empty.', 'error');
-      return;
-    }
-    if (!target_date) {
-      showToast('Target Date cannot be empty.', 'error');
-      return;
-    }
-
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Saving...';
-    }
-
-    try {
-      const res = await fetch(`/api/goals/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          target_date,
-          description: desc,
-          priority: selectedPriority
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.goal) {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Save Changes';
-        }
-        showToast(data.error || 'Failed to update goal.', 'error');
+      if (!title) {
+        showToast('Goal Name cannot be empty.', 'error');
+        return;
+      }
+      if (!target_date) {
+        showToast('Target Date cannot be empty.', 'error');
         return;
       }
 
-      const updated = {
-        ...data.goal,
-        deadline: data.goal.target_date,
-        health: data.goal.health || calculateGoalHealth(data.goal)
-      };
+      try {
+        const res = await fetch(`/api/goals/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            target_date,
+            description: desc,
+            priority: selectedPriority
+          })
+        });
 
-      const updatedGoals = Store.state.goals.map((g) => (g.id === id ? updated : g));
-      Store.setState({ goals: updatedGoals });
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.goal) {
+          showToast(data.error || 'Failed to update goal.', 'error');
+          return;
+        }
 
-      // Immediately update UI without requiring page refresh
-      renderGoals(Store.state);
-      renderHome(Store.state);
+        const updated = {
+          ...data.goal,
+          deadline: data.goal.target_date,
+          health: data.goal.health || calculateGoalHealth(data.goal)
+        };
 
-      window.closeModal('editGoalModal');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Save Changes';
+        const updatedGoals = Store.state.goals.map((g) => (g.id === id ? updated : g));
+        Store.setState({ goals: updatedGoals });
+
+        // Immediately update UI without requiring page refresh
+        renderGoals(Store.state);
+        renderHome(Store.state);
+
+        window.closeModal('editGoalModal');
+        showToast('Goal updated successfully.', 'success');
+      } catch (err) {
+        console.error('Goal update failed:', err);
+        showToast('Network error while updating goal.', 'error');
       }
-      showToast('Goal updated successfully.', 'success');
-    } catch (err) {
-      console.error('Goal update failed:', err);
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Save Changes';
-      }
-      showToast('Network error while updating goal.', 'error');
-    }
+    });
   };
 
   const editGoalForm = document.getElementById('editGoalForm');
@@ -3518,43 +3560,35 @@ function initModals() {
       if (!goalId) return;
 
       const cancelBtn = document.getElementById('cancelDeleteGoalBtn');
-      confirmDeleteBtn.disabled = true;
-      confirmDeleteBtn.textContent = 'Deleting...';
-      if (cancelBtn) cancelBtn.disabled = true;
+      return withActionLock('deleteGoal', confirmDeleteBtn, 'Deleting...', async () => {
+        if (cancelBtn) cancelBtn.disabled = true;
+        try {
+          const res = await fetch(`/api/goals/${goalId}`, {
+            method: 'DELETE'
+          });
 
-      try {
-        const res = await fetch(`/api/goals/${goalId}`, {
-          method: 'DELETE'
-        });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || 'Failed to delete goal.', 'error');
+            return;
+          }
 
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          confirmDeleteBtn.disabled = false;
-          confirmDeleteBtn.textContent = 'Delete Goal';
+          const updatedGoals = Store.state.goals.filter((g) => g.id !== goalId);
+          Store.setState({ goals: updatedGoals });
+
+          // Immediately update UI without requiring page refresh
+          renderGoals(Store.state);
+          renderHome(Store.state);
+
+          window.closeModal('deleteGoalModal');
+          showToast('Goal deleted successfully.', 'success');
+        } catch (err) {
+          console.error('Delete goal error:', err);
+          showToast('Network error while deleting goal.', 'error');
+        } finally {
           if (cancelBtn) cancelBtn.disabled = false;
-          showToast(data.error || 'Failed to delete goal.', 'error');
-          return;
         }
-
-        const updatedGoals = Store.state.goals.filter((g) => g.id !== goalId);
-        Store.setState({ goals: updatedGoals });
-
-        // Immediately update UI without requiring page refresh
-        renderGoals(Store.state);
-        renderHome(Store.state);
-
-        window.closeModal('deleteGoalModal');
-        confirmDeleteBtn.disabled = false;
-        confirmDeleteBtn.textContent = 'Delete Goal';
-        if (cancelBtn) cancelBtn.disabled = false;
-        showToast('Goal deleted successfully.', 'success');
-      } catch (err) {
-        console.error('Delete goal error:', err);
-        confirmDeleteBtn.disabled = false;
-        confirmDeleteBtn.textContent = 'Delete Goal';
-        if (cancelBtn) cancelBtn.disabled = false;
-        showToast('Network error while deleting goal.', 'error');
-      }
+      });
     });
   }
 
@@ -3577,41 +3611,43 @@ function initModals() {
       const task = (Store.state.tasks || []).find((t) => t.id === taskId);
       const goalId = task ? (task.goal_id || task.goalId) : null;
 
-      try {
-        const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (!res.ok) {
-          showToast(data.error || 'Failed to delete task.', 'error');
-          return;
-        }
-
-        const updatedTasks = (Store.state.tasks || []).filter((t) => t.id !== taskId);
-        const updatedGoals = (Store.state.goals || []).map((g) => {
-          if (g.id === goalId) {
-            const goalTasks = (g.tasks || []).filter((t) => t.id !== taskId);
-            const total = goalTasks.length;
-            const comp = goalTasks.filter((t) => t.completed).length;
-            const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
-            return {
-              ...g,
-              tasks: goalTasks,
-              totalTasks: total,
-              completedTasks: comp,
-              progress,
-              health: calculateGoalHealth({ ...g, progress })
-            };
+      return withActionLock('deleteTask', confirmDeleteTaskBtn, 'Deleting...', async () => {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) {
+            showToast(data.error || 'Failed to delete task.', 'error');
+            return;
           }
-          return g;
-        });
 
-        Store.setState({ tasks: updatedTasks, goals: updatedGoals });
-        window.closeModal('deleteTaskModal');
-        renderGoals(Store.state);
-        renderHome(Store.state);
-        showToast('Task deleted successfully.', 'success');
-      } catch (err) {
-        showToast('Network error while deleting task.', 'error');
-      }
+          const updatedTasks = (Store.state.tasks || []).filter((t) => t.id !== taskId);
+          const updatedGoals = (Store.state.goals || []).map((g) => {
+            if (g.id === goalId) {
+              const goalTasks = (g.tasks || []).filter((t) => t.id !== taskId);
+              const total = goalTasks.length;
+              const comp = goalTasks.filter((t) => t.completed).length;
+              const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
+              return {
+                ...g,
+                tasks: goalTasks,
+                totalTasks: total,
+                completedTasks: comp,
+                progress,
+                health: calculateGoalHealth({ ...g, progress })
+              };
+            }
+            return g;
+          });
+
+          Store.setState({ tasks: updatedTasks, goals: updatedGoals });
+          window.closeModal('deleteTaskModal');
+          renderGoals(Store.state);
+          renderHome(Store.state);
+          showToast('Task deleted successfully.', 'success');
+        } catch (err) {
+          showToast('Network error while deleting task.', 'error');
+        }
+      });
     });
   }
 
@@ -3623,22 +3659,24 @@ function initModals() {
       const routineId = modal?.dataset?.routineId;
       if (!routineId) return;
 
-      try {
-        const res = await fetch(`/api/routines/${routineId}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (!res.ok) {
-          showToast(data.error || 'Failed to delete routine.', 'error');
-          return;
-        }
+      return withActionLock('deleteRoutine', confirmDeleteRoutineBtn, 'Deleting...', async () => {
+        try {
+          const res = await fetch(`/api/routines/${routineId}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (!res.ok) {
+            showToast(data.error || 'Failed to delete routine.', 'error');
+            return;
+          }
 
-        const updatedRoutines = (Store.state.routines || []).filter((r) => r.id !== routineId);
-        Store.setState({ routines: updatedRoutines });
-        window.closeModal('deleteRoutineModal');
-        renderRoutines(Store.state);
-        showToast('Routine deleted successfully.', 'success');
-      } catch (err) {
-        showToast('Network error while deleting routine.', 'error');
-      }
+          const updatedRoutines = data.routines || (Store.state.routines || []).filter((r) => r.id !== routineId);
+          Store.setState({ routines: updatedRoutines });
+          window.closeModal('deleteRoutineModal');
+          renderRoutines(Store.state);
+          showToast('Routine deleted successfully.', 'success');
+        } catch (err) {
+          showToast('Network error while deleting routine.', 'error');
+        }
+      });
     });
   }
 
@@ -3755,106 +3793,94 @@ window.handleAddTaskFormSubmit = async function(e) {
     return;
   }
 
-  const goalIdSelect = document.getElementById('newTaskGoalId');
-  const goalId = (goalIdSelect && goalIdSelect.value) ? goalIdSelect.value : null;
-
-  const descInput = document.getElementById('newTaskDesc');
-  const description = (descInput?.value || '').trim();
-
-  const prioritySelect = document.getElementById('newTaskPriority');
-  const priority = prioritySelect?.value || 'Medium';
-
-  const durationInput = document.getElementById('newTaskDuration');
-  const duration = parseInt(durationInput?.value, 10) || 30;
-
-  const dueDateInput = document.getElementById('newTaskDueDate');
-  const dueDate = (dueDateInput?.value || '').trim() || null;
-
   const submitBtn = document.getElementById('newTaskSubmitBtn');
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Creating...';
-  }
+  return withActionLock('addTask', submitBtn, 'Creating...', async () => {
+    const goalIdSelect = document.getElementById('newTaskGoalId');
+    const goalId = (goalIdSelect && goalIdSelect.value) ? goalIdSelect.value : null;
 
-  try {
-    const res = await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        goal_id: goalId,
-        description,
-        priority,
-        duration_minutes: duration,
-        due_date: dueDate
-      })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success || !data.task) {
-      showToast(data.error || 'Failed to create task.', 'error');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Task';
-      }
-      return;
-    }
+    const descInput = document.getElementById('newTaskDesc');
+    const description = (descInput?.value || '').trim();
 
-    const newTask = data.task;
-    const updatedTasks = [...(Store.state.tasks || []), newTask];
+    const prioritySelect = document.getElementById('newTaskPriority');
+    const priority = prioritySelect?.value || 'Medium';
 
-    let updatedGoals = Store.state.goals;
-    if (data.goalProgress && newTask.goal_id) {
-      updatedGoals = (Store.state.goals || []).map((g) => {
-        if (g.id === newTask.goal_id) {
-          const goalTasks = [...(g.tasks || []), newTask];
-          return {
-            ...g,
-            tasks: goalTasks,
-            totalTasks: data.goalProgress.totalTasks,
-            completedTasks: data.goalProgress.completedTasks,
-            progress: data.goalProgress.progress,
-            health: calculateGoalHealth({ ...g, progress: data.goalProgress.progress })
-          };
-        }
-        return g;
+    const durationInput = document.getElementById('newTaskDuration');
+    const duration = parseInt(durationInput?.value, 10) || 30;
+
+    const dueDateInput = document.getElementById('newTaskDueDate');
+    const dueDate = (dueDateInput?.value || '').trim() || null;
+
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          goal_id: goalId,
+          description,
+          priority,
+          duration_minutes: duration,
+          due_date: dueDate
+        })
       });
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.task) {
+        showToast(data.error || 'Failed to create task.', 'error');
+        return;
+      }
+
+      const newTask = data.task;
+      const updatedTasks = [...(Store.state.tasks || []), newTask];
+
+      let updatedGoals = Store.state.goals;
+      if (data.goalProgress && newTask.goal_id) {
+        updatedGoals = (Store.state.goals || []).map((g) => {
+          if (g.id === newTask.goal_id) {
+            const goalTasks = [...(g.tasks || []), newTask];
+            return {
+              ...g,
+              tasks: goalTasks,
+              totalTasks: data.goalProgress.totalTasks,
+              completedTasks: data.goalProgress.completedTasks,
+              progress: data.goalProgress.progress,
+              health: calculateGoalHealth({ ...g, progress: data.goalProgress.progress })
+            };
+          }
+          return g;
+        });
+      }
+
+      const newActivity = {
+        id: `a-${Date.now()}`,
+        title: 'Added task',
+        subtitle: title,
+        time: 'Just now'
+      };
+
+      Store.setState({
+        tasks: updatedTasks,
+        goals: updatedGoals,
+        isColdStart: false,
+        activities: [newActivity, ...(Store.state.activities || []).slice(0, 9)]
+      });
+
+      closeModal('addTaskModal');
+      const form = document.getElementById('addTaskForm');
+      if (form) form.reset();
+
+      await Store.loadTodaySchedule();
+      await Store.loadInsights();
+
+      renderGoals(Store.state);
+      renderHome(Store.state);
+      renderTasks(Store.state);
+      if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
+
+      showToast(goalId ? 'Task added to goal.' : 'Independent task created.', 'success');
+    } catch (err) {
+      showToast('Network error while creating task.', 'error');
     }
-
-    const newActivity = {
-      id: `a-${Date.now()}`,
-      title: 'Added task',
-      subtitle: title,
-      time: 'Just now'
-    };
-
-    Store.setState({
-      tasks: updatedTasks,
-      goals: updatedGoals,
-      isColdStart: false,
-      activities: [newActivity, ...(Store.state.activities || []).slice(0, 9)]
-    });
-
-    closeModal('addTaskModal');
-    const form = document.getElementById('addTaskForm');
-    if (form) form.reset();
-
-    await Store.loadTodaySchedule();
-    await Store.loadInsights();
-
-    renderGoals(Store.state);
-    renderHome(Store.state);
-    renderTasks(Store.state);
-    if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
-
-    showToast(goalId ? 'Task added to goal.' : 'Independent task created.', 'success');
-  } catch (err) {
-    showToast('Network error while creating task.', 'error');
-  } finally {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Create Task';
-    }
-  }
+  });
 };
 
 // ==========================================================================
@@ -4556,63 +4582,69 @@ async function executeSaveInitialSetup(isCompleting) {
     return;
   }
 
-  // Combine initial commitments and any classified gaps
-  const classifiedBlocks = Object.values(initialSetupClassifiedGaps).filter((g) => g && g.name);
-  const allBlocksToSave = [...initialSetupBlocks, ...classifiedBlocks];
+  const activeBtn = isCompleting
+    ? (document.getElementById('finishInitialRoutineBtn') || document.getElementById('saveInitialRoutineBtn'))
+    : (document.getElementById('saveProgressRoutineBtn') || document.getElementById('saveInitialRoutineBtn'));
 
-  try {
-    const res = await fetch('/api/routines/initial-setup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        weekdays_days: initialSetupDays.weekdays_days,
-        weekends_days: initialSetupDays.weekends_days,
-        routines: allBlocksToSave
-      })
-    });
+  return withActionLock('executeSaveInitialSetup', activeBtn, isCompleting ? 'Saving routine...' : 'Saving progress...', async () => {
+    // Combine initial commitments and any classified gaps
+    const classifiedBlocks = Object.values(initialSetupClassifiedGaps).filter((g) => g && g.name);
+    const allBlocksToSave = [...initialSetupBlocks, ...classifiedBlocks];
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
+    try {
+      const res = await fetch('/api/routines/initial-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekdays_days: initialSetupDays.weekdays_days,
+          weekends_days: initialSetupDays.weekends_days,
+          routines: allBlocksToSave
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        if (errEl && msgEl) {
+          msgEl.textContent = data.error || 'Failed to save routine setup.';
+          errEl.style.display = 'flex';
+        }
+        return;
+      }
+
+      sessionStorage.removeItem('ekagra_routine_dismissed_session');
+
+      Store.setState({
+        scheduleSettings: data.settings,
+        routines: data.routines || [],
+        routine_coverage_incomplete: false,
+        is_routine_complete: true,
+        needs_routine_setup: false
+      });
+
+      const banner = document.getElementById('globalRoutineIncompleteBanner');
+      if (banner) {
+        banner.style.display = 'none';
+      }
+      if (typeof window.updateGlobalRoutineBanner === 'function') {
+        window.updateGlobalRoutineBanner(Store.state);
+      }
+
+      window.closeModal('initialRoutineModal');
+      if (typeof renderGoals === 'function') renderGoals(Store.state);
+      if (typeof renderRoutines === 'function') renderRoutines(Store.state);
+      if (typeof renderScheduleCalendar === 'function') renderScheduleCalendar(Store.state);
+      if (typeof renderInsights === 'function') renderInsights(Store.state);
+      if (typeof updateDashboardCards === 'function') updateDashboardCards(Store.state);
+
+      showToast(isCompleting ? 'Routine saved successfully!' : 'Routine progress saved! You can complete your remaining schedule anytime in Routines.', 'success');
+      window.showFirstTaskNotification();
+    } catch (e) {
       if (errEl && msgEl) {
-        msgEl.textContent = data.error || 'Failed to save routine setup.';
+        msgEl.textContent = 'Network error saving routine setup.';
         errEl.style.display = 'flex';
       }
-      return;
     }
-
-    sessionStorage.removeItem('ekagra_routine_dismissed_session');
-
-    Store.setState({
-      scheduleSettings: data.settings,
-      routines: data.routines || [],
-      routine_coverage_incomplete: false,
-      is_routine_complete: true,
-      needs_routine_setup: false
-    });
-
-    const banner = document.getElementById('globalRoutineIncompleteBanner');
-    if (banner) {
-      banner.style.display = 'none';
-    }
-    if (typeof window.updateGlobalRoutineBanner === 'function') {
-      window.updateGlobalRoutineBanner(Store.state);
-    }
-
-    window.closeModal('initialRoutineModal');
-    if (typeof renderGoals === 'function') renderGoals(Store.state);
-    if (typeof renderRoutines === 'function') renderRoutines(Store.state);
-    if (typeof renderScheduleCalendar === 'function') renderScheduleCalendar(Store.state);
-    if (typeof renderInsights === 'function') renderInsights(Store.state);
-    if (typeof updateDashboardCards === 'function') updateDashboardCards(Store.state);
-
-    showToast(isCompleting ? 'Routine saved successfully!' : 'Routine progress saved! You can complete your remaining schedule anytime in Routines.', 'success');
-    window.showFirstTaskNotification();
-  } catch (e) {
-    if (errEl && msgEl) {
-      msgEl.textContent = 'Network error saving routine setup.';
-      errEl.style.display = 'flex';
-    }
-  }
+  });
 }
 
 // Gap Classification Modal Functions for Routines Section
@@ -4666,7 +4698,7 @@ window.setClassifyGapType = function(type) {
 };
 
 window.handleClassifyGapSubmit = async function(e) {
-  e.preventDefault();
+  if (e && e.preventDefault) e.preventDefault();
   const startTime = document.getElementById('classifyGapStart')?.value;
   const endTime = document.getElementById('classifyGapEnd')?.value;
   const group = document.getElementById('classifyGapGroup')?.value || 'weekdays';
@@ -4679,38 +4711,42 @@ window.handleClassifyGapSubmit = async function(e) {
     return;
   }
 
-  try {
-    const res = await fetch('/api/routines', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        start_time: startTime,
-        end_time: endTime,
-        schedule_group: group,
-        type: isFlex ? 'Flexible' : 'Fixed',
-        activity_classification: name,
-        availability_type: availType
-      })
-    });
+  const btn = document.querySelector('#classifyGapModal button[type="submit"]') || document.getElementById('classifyGapSubmitBtn');
+  return withActionLock('classifyGap', btn, 'Saving...', async () => {
+    try {
+      const res = await fetch('/api/routines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          start_time: startTime,
+          end_time: endTime,
+          schedule_group: group,
+          type: isFlex ? 'Flexible' : 'Fixed',
+          activity_classification: name,
+          availability_type: availType
+        })
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
-      showToast(data.error || 'Failed to classify gap.', 'error');
-      return;
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Failed to classify gap.', 'error');
+        return;
+      }
+
+      const updatedRoutines = data.routines || [...(Store.state.routines || []), data.routine];
+      Store.setState({
+        routines: updatedRoutines,
+        activeRoutineGroup: group
+      });
+
+      window.closeModal('classifyGapModal');
+      renderRoutines(Store.state);
+      showToast('Gap classified successfully!', 'success');
+    } catch (err) {
+      showToast('Network error classifying gap.', 'error');
     }
-
-    Store.setState({
-      routines: [...(Store.state.routines || []), data.routine],
-      activeRoutineGroup: group
-    });
-
-    window.closeModal('classifyGapModal');
-    renderRoutines(Store.state);
-    showToast('Gap classified successfully!', 'success');
-  } catch (err) {
-    showToast('Network error classifying gap.', 'error');
-  }
+  });
 };
 
 window.openAddRoutineModalForGroup = function(group, event) {
@@ -4886,33 +4922,36 @@ window.saveDayAssignmentsSubmit = async function() {
     return;
   }
 
-  try {
-    const res = await fetch('/api/routines/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        weekdays_days: editing.weekdays_days,
-        weekends_days: editing.weekends_days
-      })
-    });
+  const btn = document.querySelector('#customizeDaysModal .btn-primary-emerald') || document.getElementById('saveDaysSettingsBtn');
+  return withActionLock('saveDayAssignments', btn, 'Saving...', async () => {
+    try {
+      const res = await fetch('/api/routines/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekdays_days: editing.weekdays_days,
+          weekends_days: editing.weekends_days
+        })
+      });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      showToast(data.error || 'Failed to update schedule day assignments.', 'error');
-      return;
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to update schedule day assignments.', 'error');
+        return;
+      }
+
+      Store.setState({
+        scheduleSettings: data.settings,
+        editingDayAssignments: null
+      });
+
+      window.closeModal('customizeDaysModal');
+      renderRoutines(Store.state);
+      showToast('Schedule day assignments updated successfully.', 'success');
+    } catch (e) {
+      showToast('Network error updating day assignments.', 'error');
     }
-
-    Store.setState({
-      scheduleSettings: data.settings,
-      editingDayAssignments: null
-    });
-
-    window.closeModal('customizeDaysModal');
-    renderRoutines(Store.state);
-    showToast('Schedule day assignments updated successfully.', 'success');
-  } catch (e) {
-    showToast('Network error updating day assignments.', 'error');
-  }
+  });
 };
 
 window.setRoutineFormGroup = function(group) {
@@ -5044,54 +5083,59 @@ window.handleRoutineFormSubmit = async function(event) {
 
   const type = document.querySelector('#routineTypePills .routine-type-btn.selected')?.getAttribute('data-type') || 'Fixed';
 
-  try {
-    const url = id ? `/api/routines/${id}` : '/api/routines';
-    const method = id ? 'PUT' : 'POST';
+  const submitBtn = document.getElementById('routineSubmitBtn') || document.querySelector('#addRoutineModal button[type="submit"]');
+  return withActionLock('routineSubmit', submitBtn, 'Saving...', async () => {
+    try {
+      const url = id ? `/api/routines/${id}` : '/api/routines';
+      const method = id ? 'PUT' : 'POST';
 
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        name, 
-        start_time, 
-        end_time, 
-        days: selectedDays, 
-        type,
-        schedule_group: selectedGroup,
-        activity_classification
-      })
-    });
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          name, 
+          start_time, 
+          end_time, 
+          days: selectedDays, 
+          type,
+          schedule_group: selectedGroup,
+          activity_classification
+        })
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
-      if (res.status === 409 && alertEl && msgEl) {
-        msgEl.textContent = data.error || 'Routine block overlaps with an existing block on the same day.';
-        alertEl.style.display = 'flex';
-      } else {
-        showToast(data.error || 'Failed to save routine.', 'error');
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409 && alertEl && msgEl) {
+          msgEl.textContent = data.error || 'This time slot overlaps an existing routine block.';
+          alertEl.style.display = 'flex';
+        } else {
+          showToast(data.error || 'Failed to save routine.', 'error');
+        }
+        return;
       }
-      return;
+
+      if (alertEl) alertEl.style.display = 'none';
+
+      let updatedRoutines = data.routines;
+      if (!updatedRoutines) {
+        if (id) {
+          updatedRoutines = (Store.state.routines || []).map((r) => (r.id === id ? data.routine : r));
+        } else {
+          updatedRoutines = [...(Store.state.routines || []), data.routine];
+        }
+      }
+
+      Store.setState({ 
+        routines: updatedRoutines,
+        activeRoutineGroup: selectedGroup 
+      });
+      window.closeModal('addRoutineModal');
+      renderRoutines(Store.state);
+      showToast(id ? 'Routine updated successfully.' : 'Routine added successfully.', 'success');
+    } catch (err) {
+      showToast('Network error saving routine.', 'error');
     }
-
-    if (alertEl) alertEl.style.display = 'none';
-
-    let updatedRoutines;
-    if (id) {
-      updatedRoutines = (Store.state.routines || []).map((r) => (r.id === id ? data.routine : r));
-    } else {
-      updatedRoutines = [...(Store.state.routines || []), data.routine];
-    }
-
-    Store.setState({ 
-      routines: updatedRoutines,
-      activeRoutineGroup: selectedGroup 
-    });
-    window.closeModal('addRoutineModal');
-    renderRoutines(Store.state);
-    showToast(id ? 'Routine updated successfully.' : 'Routine added successfully.', 'success');
-  } catch (err) {
-    showToast('Network error saving routine.', 'error');
-  }
+  });
 };
 
 window.openDeleteRoutineModal = function(routineId) {
@@ -5319,57 +5363,60 @@ window.handleEditTaskFormSubmit = async function(event) {
     return;
   }
 
-  try {
-    const res = await fetch(`/api/tasks/${taskId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        description: desc,
-        priority,
-        duration_minutes: duration,
-        due_date: dueDate
-      })
-    });
+  const submitBtn = document.getElementById('editTaskSubmitBtn') || document.querySelector('#editTaskModal button[type="submit"]');
+  return withActionLock('editTask', submitBtn, 'Saving...', async () => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description: desc,
+          priority,
+          duration_minutes: duration,
+          due_date: dueDate
+        })
+      });
 
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      showToast(data.error || 'Failed to update task.', 'error');
-      return;
-    }
-
-    const updatedTask = data.task;
-    const updatedTasks = (Store.state.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
-
-    const updatedGoals = (Store.state.goals || []).map((g) => {
-      if (g.id === goalId || (g.tasks && g.tasks.some((t) => t.id === taskId))) {
-        const goalTasks = (g.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
-        const total = goalTasks.length;
-        const comp = goalTasks.filter((t) => t.completed).length;
-        const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
-        return {
-          ...g,
-          tasks: goalTasks,
-          totalTasks: total,
-          completedTasks: comp,
-          progress,
-          health: calculateGoalHealth({ ...g, progress })
-        };
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showToast(data.error || 'Failed to update task.', 'error');
+        return;
       }
-      return g;
-    });
 
-    Store.setState({ tasks: updatedTasks, goals: updatedGoals });
-    window.closeModal('editTaskModal');
-    await Store.loadTodaySchedule();
-    renderGoals(Store.state);
-    renderHome(Store.state);
-    renderTasks(Store.state);
-    if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
-    showToast('Task updated successfully.', 'success');
-  } catch (err) {
-    showToast('Network error while updating task.', 'error');
-  }
+      const updatedTask = data.task;
+      const updatedTasks = (Store.state.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
+
+      const updatedGoals = (Store.state.goals || []).map((g) => {
+        if (g.id === goalId || (g.tasks && g.tasks.some((t) => t.id === taskId))) {
+          const goalTasks = (g.tasks || []).map((t) => (t.id === taskId ? updatedTask : t));
+          const total = goalTasks.length;
+          const comp = goalTasks.filter((t) => t.completed).length;
+          const progress = total > 0 ? Math.round((comp / total) * 100) : 0;
+          return {
+            ...g,
+            tasks: goalTasks,
+            totalTasks: total,
+            completedTasks: comp,
+            progress,
+            health: calculateGoalHealth({ ...g, progress })
+          };
+        }
+        return g;
+      });
+
+      Store.setState({ tasks: updatedTasks, goals: updatedGoals });
+      window.closeModal('editTaskModal');
+      await Store.loadTodaySchedule();
+      renderGoals(Store.state);
+      renderHome(Store.state);
+      renderTasks(Store.state);
+      if (Store.state.currentView === 'schedule') renderSchedule(Store.state);
+      showToast('Task updated successfully.', 'success');
+    } catch (err) {
+      showToast('Network error while updating task.', 'error');
+    }
+  });
 };
 
 window.openDeleteTaskModal = function(taskId) {
@@ -5533,79 +5580,74 @@ window.handleSaveAiKeyFromModal = async function(event) {
     return;
   }
 
-  if (saveBtn) {
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Encrypting & Saving...';
-  }
+  return withActionLock('saveAiKey', saveBtn, 'Encrypting & Saving...', async () => {
+    try {
+      const res = await fetch('/api/tasks/ai-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'user_key',
+          provider: 'gemini',
+          apiKey
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        window.ekagraAiSettings = data.settings;
+        if (modalInput) modalInput.value = '';
+        window.closeModal('aiKeyModal');
 
-  try {
-    const res = await fetch('/api/tasks/ai-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mode: 'user_key',
-        provider: 'gemini',
-        apiKey
-      })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.success) {
-      window.ekagraAiSettings = data.settings;
-      if (modalInput) modalInput.value = '';
-      window.closeModal('aiKeyModal');
+        // Reload settings UI from backend
+        await loadAiSettingsIntoSettingsPage({ preserveFeedback: true });
 
-      // Reload settings UI from backend
-      await loadAiSettingsIntoSettingsPage({ preserveFeedback: true });
-
-      if (feedback) {
-        feedback.innerHTML = `✅ <strong>Key saved:</strong> Gemini API key encrypted (AES-256-GCM) and connected.`;
-        feedback.className = 'inline-ai-notice ai-notice-success';
-        feedback.style.display = 'block';
+        if (feedback) {
+          feedback.innerHTML = `✅ <strong>Key saved:</strong> Gemini API key encrypted (AES-256-GCM) and connected.`;
+          feedback.className = 'inline-ai-notice ai-notice-success';
+          feedback.style.display = 'block';
+        }
+        showToast('Gemini API key encrypted and saved.', 'success');
+      } else {
+        // Keep modal open and preserve entered input
+        if (errorMsg) {
+          errorMsg.textContent = `❌ ${data.message || 'Failed to save API key.'}`;
+          errorMsg.className = 'inline-ai-notice ai-notice-error';
+          errorMsg.style.display = 'block';
+        }
+        modalInput?.focus();
       }
-      showToast('Gemini API key encrypted and saved.', 'success');
-    } else {
+    } catch (err) {
       // Keep modal open and preserve entered input
       if (errorMsg) {
-        errorMsg.textContent = `❌ ${data.message || 'Failed to save API key.'}`;
+        errorMsg.textContent = '❌ Network error saving API key. Please check your connection.';
         errorMsg.className = 'inline-ai-notice ai-notice-error';
         errorMsg.style.display = 'block';
       }
-      modalInput?.focus();
     }
-  } catch (err) {
-    // Keep modal open and preserve entered input
-    if (errorMsg) {
-      errorMsg.textContent = '❌ Network error saving API key. Please check your connection.';
-      errorMsg.className = 'inline-ai-notice ai-notice-error';
-      errorMsg.style.display = 'block';
-    }
-  } finally {
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = 'Save API Key';
-    }
-  }
+  });
 };
 
 // Remove personal key from settings
 window.removePersonalApiKeyFromSettings = async function() {
-  const feedback = document.getElementById('aiSettingsFeedbackMsg');
-  try {
-    const res = await fetch('/api/tasks/ai-settings/key', { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-      window.ekagraAiSettings = data.settings;
-      await loadAiSettingsIntoSettingsPage({ preserveFeedback: true });
-      if (feedback) {
-        feedback.innerHTML = 'ℹ️ <strong>Key removed:</strong> Your personal Gemini API key has been securely removed.';
-        feedback.className = 'inline-ai-notice ai-notice-info';
-        feedback.style.display = 'block';
+  const btn = document.querySelector('[onclick="removePersonalApiKeyFromSettings()"]');
+  return withActionLock('removeAiKey', btn, 'Removing...', async () => {
+    const feedback = document.getElementById('aiSettingsFeedbackMsg');
+    try {
+      const res = await fetch('/api/tasks/ai-settings/key', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        window.ekagraAiSettings = data.settings;
+        await loadAiSettingsIntoSettingsPage({ preserveFeedback: true });
+        if (feedback) {
+          feedback.innerHTML = 'ℹ️ <strong>Key removed:</strong> Your personal Gemini API key has been securely removed.';
+          feedback.className = 'inline-ai-notice ai-notice-info';
+          feedback.style.display = 'block';
+        }
+        showToast('Gemini API key removed.', 'info');
       }
-      showToast('Gemini API key removed.', 'info');
+    } catch (err) {
+      console.error('[EKAGRA AI] Failed to remove key:', err);
     }
-  } catch (err) {
-    console.error('[EKAGRA AI] Failed to remove key:', err);
-  }
+  });
 };
 
 // Test connection endpoint caller
@@ -5613,72 +5655,65 @@ window.testAiProviderConnection = async function() {
   const testBtn = document.getElementById('testAiConnectionBtn');
   const feedback = document.getElementById('aiSettingsFeedbackMsg');
 
-  if (testBtn) {
-    testBtn.disabled = true;
-    testBtn.textContent = '⚡ Testing connection...';
-  }
   if (feedback) feedback.style.display = 'none';
 
-  try {
-    const res = await fetch('/api/tasks/ai-settings/test-connection', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const data = await res.json();
+  return withActionLock('testAiConnection', testBtn, 'Testing connection...', async () => {
+    try {
+      const res = await fetch('/api/tasks/ai-settings/test-connection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
 
-    if (!feedback) return;
+      if (!feedback) return;
 
-    if (data.success && data.status === 'SUCCESS') {
-      feedback.className = 'inline-ai-notice ai-notice-success';
-      feedback.innerHTML = `✅ <strong>Connected:</strong> ${data.message || 'Connection verified! Gemini is connected and responding.'}`;
-      feedback.style.display = 'block';
-      showToast('AI connection verified successfully.', 'success');
-    } else if (data.status === 'QUOTA_EXCEEDED') {
-      feedback.className = 'inline-ai-notice ai-notice-error';
-      const quotaMsg = data.message || 'Your Gemini API quota is currently unavailable. Check your Google AI Studio usage and rate limits, or try again later.';
-      feedback.innerHTML = `⚠️ <strong>Quota Unavailable:</strong> ${quotaMsg} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Check Google AI Studio ↗</a>`;
-      feedback.style.display = 'block';
-    } else if (data.status === 'UNSUPPORTED_KEY_TYPE') {
-      feedback.className = 'inline-ai-notice ai-notice-error';
-      feedback.innerHTML = `❌ <strong>Unsupported Key Type:</strong> ${escapeHtml(data.message || 'Standard Gemini API key required.')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Get Standard Key ↗</a>`;
-      feedback.style.display = 'block';
-    } else if (data.status === 'PERMISSION_DENIED') {
-      feedback.className = 'inline-ai-notice ai-notice-error';
-      feedback.innerHTML = `🚫 <strong>Access Denied:</strong> ${escapeHtml(data.message || 'Google Gemini project has been denied access.')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Review Project ↗</a>`;
-      feedback.style.display = 'block';
-    } else if (data.status === 'INVALID_KEY') {
-      feedback.className = 'inline-ai-notice ai-notice-error';
-      feedback.innerHTML = `❌ <strong>Invalid Key:</strong> ${data.message || 'Invalid or unauthorized Gemini API key. Please check your key from Google AI Studio and update it.'} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Get Key ↗</a>`;
-      feedback.style.display = 'block';
-    } else if (data.status === 'TEMPORARILY_UNAVAILABLE') {
-      feedback.className = 'inline-ai-notice ai-notice-warning';
-      feedback.innerHTML = `⏳ <strong>High Demand:</strong> ${data.message || 'The Gemini provider is experiencing high demand and is temporarily unavailable. Please try again later.'}`;
-      feedback.style.display = 'block';
-    } else if (data.status === 'TIMEOUT') {
-      feedback.className = 'inline-ai-notice ai-notice-warning';
-      feedback.innerHTML = `⏱️ <strong>Timeout:</strong> ${data.message || 'Connection test timed out. Please verify your connection or try again later.'}`;
-      feedback.style.display = 'block';
-    } else if (data.status === 'NOT_CONFIGURED') {
-      feedback.className = 'inline-ai-notice ai-notice-warning';
-      feedback.innerHTML = `⚠️ <strong>Not Configured:</strong> No Gemini API key has been added yet. Click <strong>Add API Key</strong> to connect your key.`;
-      feedback.style.display = 'block';
-    } else {
-      feedback.className = 'inline-ai-notice ai-notice-error';
-      feedback.innerHTML = `❌ <strong>Error:</strong> ${data.message || 'Provider connection test failed.'}`;
-      feedback.style.display = 'block';
+      if (data.success && data.status === 'SUCCESS') {
+        feedback.className = 'inline-ai-notice ai-notice-success';
+        feedback.innerHTML = `✅ <strong>Connected:</strong> ${data.message || 'Connection verified! Gemini is connected and responding.'}`;
+        feedback.style.display = 'block';
+        showToast('AI connection verified successfully.', 'success');
+      } else if (data.status === 'QUOTA_EXCEEDED') {
+        feedback.className = 'inline-ai-notice ai-notice-error';
+        const quotaMsg = data.message || 'Your Gemini API quota is currently unavailable. Check your Google AI Studio usage and rate limits, or try again later.';
+        feedback.innerHTML = `⚠️ <strong>Quota Unavailable:</strong> ${quotaMsg} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Check Google AI Studio ↗</a>`;
+        feedback.style.display = 'block';
+      } else if (data.status === 'UNSUPPORTED_KEY_TYPE') {
+        feedback.className = 'inline-ai-notice ai-notice-error';
+        feedback.innerHTML = `❌ <strong>Unsupported Key Type:</strong> ${escapeHtml(data.message || 'Standard Gemini API key required.')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Get Standard Key ↗</a>`;
+        feedback.style.display = 'block';
+      } else if (data.status === 'PERMISSION_DENIED') {
+        feedback.className = 'inline-ai-notice ai-notice-error';
+        feedback.innerHTML = `🚫 <strong>Access Denied:</strong> ${escapeHtml(data.message || 'Google Gemini project has been denied access.')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Review Project ↗</a>`;
+        feedback.style.display = 'block';
+      } else if (data.status === 'INVALID_KEY') {
+        feedback.className = 'inline-ai-notice ai-notice-error';
+        feedback.innerHTML = `❌ <strong>Invalid Key:</strong> ${data.message || 'Invalid or unauthorized Gemini API key. Please check your key from Google AI Studio and update it.'} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600; margin-left: 4px;">Get Key ↗</a>`;
+        feedback.style.display = 'block';
+      } else if (data.status === 'TEMPORARILY_UNAVAILABLE') {
+        feedback.className = 'inline-ai-notice ai-notice-warning';
+        feedback.innerHTML = `⏳ <strong>High Demand:</strong> ${data.message || 'The Gemini provider is experiencing high demand and is temporarily unavailable. Please try again later.'}`;
+        feedback.style.display = 'block';
+      } else if (data.status === 'TIMEOUT') {
+        feedback.className = 'inline-ai-notice ai-notice-warning';
+        feedback.innerHTML = `⏱️ <strong>Timeout:</strong> ${data.message || 'Connection test timed out. Please verify your connection or try again later.'}`;
+        feedback.style.display = 'block';
+      } else if (data.status === 'NOT_CONFIGURED') {
+        feedback.className = 'inline-ai-notice ai-notice-warning';
+        feedback.innerHTML = `⚠️ <strong>Not Configured:</strong> No Gemini API key has been added yet. Click <strong>Add API Key</strong> to connect your key.`;
+        feedback.style.display = 'block';
+      } else {
+        feedback.className = 'inline-ai-notice ai-notice-error';
+        feedback.innerHTML = `❌ <strong>Error:</strong> ${data.message || 'Provider connection test failed.'}`;
+        feedback.style.display = 'block';
+      }
+    } catch (err) {
+      if (feedback) {
+        feedback.className = 'inline-ai-notice ai-notice-error';
+        feedback.innerHTML = `❌ <strong>Network Error:</strong> Failed to connect to server: ${err.message}`;
+        feedback.style.display = 'block';
+      }
     }
-  } catch (err) {
-    if (feedback) {
-      feedback.className = 'inline-ai-notice ai-notice-error';
-      feedback.innerHTML = `❌ <strong>Network Error:</strong> Failed to connect to server: ${err.message}`;
-      feedback.style.display = 'block';
-    }
-  } finally {
-    if (testBtn) {
-      testBtn.disabled = false;
-      testBtn.textContent = '⚡ Test Connection';
-    }
-  }
+  });
 };
 
 // Toggle API key password/text visibility

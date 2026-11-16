@@ -54,7 +54,7 @@ async function runAudit() {
     // ----------------------------------------------------
     const uniqueUser = `audit_user_${Date.now()}@ekagra.ai`;
     await page.goto(`${BASE_URL}/signup`, { waitUntil: 'networkidle2' });
-    
+
     await page.type('#name', 'Audit Tester');
     await page.type('#email', uniqueUser);
     await page.type('#password', 'Password123!');
@@ -88,7 +88,7 @@ async function runAudit() {
       const tabWe = document.getElementById('modalTabWeekends');
       const titleWd = tabWd ? tabWd.querySelector('.routine-group-tab-title') || tabWd.firstElementChild : null;
       const titleWe = tabWe ? tabWe.querySelector('.routine-group-tab-title') || tabWe.firstElementChild : null;
-      
+
       const compWd = titleWd ? window.getComputedStyle(titleWd).color : null;
       const compWe = titleWe ? window.getComputedStyle(titleWe).color : null;
       return { compWd, compWe };
@@ -122,15 +122,24 @@ async function runAudit() {
     });
     record('ROUTINE MODAL', 'Commitment blocks added and rendered in list', blocksCount >= 2, `Count: ${blocksCount}`);
 
-    // Click "Save Routine" button (#saveInitialRoutineBtn)
-    await page.click('#saveInitialRoutineBtn');
-    
+    // Test rapid multi-clicking on "Save Routine" button (#saveInitialRoutineBtn)
+    await page.evaluate(() => {
+      const btn = document.getElementById('saveInitialRoutineBtn');
+      if (btn) {
+        // Fire 4 rapid clicks
+        btn.click();
+        btn.click();
+        btn.click();
+        btn.click();
+      }
+    });
+
     // Wait for modal to close
     await page.waitForFunction(() => {
       const modal = document.getElementById('initialRoutineModal');
       return modal && !modal.classList.contains('open');
     }, { timeout: 5000 });
-    record('ROUTINE MODAL', 'Save Routine button persists routines and closes modal', true);
+    record('ROUTINE MODAL', 'Save Routine button survives rapid clicks and persists routines cleanly', true);
 
     // Verify global banner is dismissed
     const bannerDisplay = await page.evaluate(() => {
@@ -156,7 +165,7 @@ async function runAudit() {
       return menu && (menu.classList.contains('active') || menu.classList.contains('open') || window.getComputedStyle(menu).display !== 'none');
     });
     record('TOPBAR', 'User profile button toggles dropdown menu', isMenuOpen);
-    
+
     // Click Settings inside dropdown
     await page.click('#menuSettingsBtn');
     const isSettingsActive = await page.evaluate(() => document.getElementById('view-settings')?.classList.contains('active'));
@@ -179,7 +188,7 @@ async function runAudit() {
     // STEP 4: Goals View (CRUD & Interactive Elements)
     // ----------------------------------------------------
     await page.click('button.nav-link-btn[data-view="goals"]');
-    
+
     // Open Add Goal Modal
     await page.evaluate(() => window.openAddGoalModal());
     await page.waitForSelector('#addGoalModal.open', { visible: true });
@@ -248,7 +257,7 @@ async function runAudit() {
     // STEP 5: Tasks View (CRUD & Filtering)
     // ----------------------------------------------------
     await page.click('button.nav-link-btn[data-view="tasks"]');
-    
+
     // Open Add Task Modal
     await page.evaluate(() => window.openAddTaskModal());
     await page.waitForSelector('#addTaskModal.open', { visible: true });
@@ -338,6 +347,27 @@ async function runAudit() {
     });
     record('ROUTINES', 'Weekdays/Weekends schedule group tabs toggle', isWeekendsActive);
 
+    // Test rapid multi-clicking on "Copy Weekdays Routine to Weekends" (#btnCopyWeekdaysToWeekends)
+    const copyActionResults = await page.evaluate(async () => {
+      const btn = document.getElementById('btnCopyWeekdaysToWeekends');
+      if (!btn) return { found: false, maxDuplicates: 0 };
+      // Rapid fire 4 clicks
+      btn.click();
+      btn.click();
+      btn.click();
+      btn.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const weekends = (window.Store.state.routines || []).filter((r) => r.schedule_group === 'weekends');
+      const counts = {};
+      for (const r of weekends) {
+        const k = `${r.start_time}-${r.end_time}`;
+        counts[k] = (counts[k] || 0) + 1;
+      }
+      const maxDuplicates = Object.keys(counts).length > 0 ? Math.max(...Object.values(counts)) : 0;
+      return { found: true, count: weekends.length, maxDuplicates };
+    });
+    record('ROUTINES', 'Rapid multi-clicks on Copy Weekdays produces 0 duplicates in Weekends', copyActionResults.maxDuplicates <= 1, `Max per slot: ${copyActionResults.maxDuplicates}`);
+
     // Test Customize Days Modal
     await page.evaluate(() => window.openCustomizeDaysModal());
     await page.waitForSelector('#customizeDaysModal.open', { visible: true });
@@ -374,7 +404,7 @@ async function runAudit() {
     // ----------------------------------------------------
     await page.click('button.nav-link-btn[data-view="settings"]');
     await page.waitForSelector('#view-settings.active', { visible: true });
-    
+
     // Toggle notification checkboxes
     await page.evaluate(() => {
       const cb = document.getElementById('settingNotifyTasks');
@@ -395,7 +425,7 @@ async function runAudit() {
     // ----------------------------------------------------
     await page.click('button.nav-link-btn[data-view="home"]');
     await page.waitForSelector('#view-home.active', { visible: true });
-    
+
     // Check Next Task container
     const nextTaskPresent = await page.evaluate(() => Boolean(document.getElementById('homeNextTaskContainer')));
     record('HOME', 'Home View Next Task and Today Progress rendered', nextTaskPresent);

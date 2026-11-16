@@ -4269,3 +4269,32 @@ body {
 .routine-group-tab-btn:focus:not(:focus-visible) {
   outline: none;
 }
+
+/* ==========================================================================
+   Universal Button Action Locking & Feedback
+   ========================================================================== */
+button[aria-busy="true"],
+.btn-action-locked {
+  cursor: not-allowed !important;
+  opacity: 0.75 !important;
+  pointer-events: none !important;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  vertical-align: -0.1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btnSpinnerRotate 0.6s linear infinite;
+  margin-right: 0.35rem;
+}
+
+@keyframes btnSpinnerRotate {
+  to {
+    transform: rotate(360deg);
+  }
+}

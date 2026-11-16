@@ -13,7 +13,12 @@ const {
   checkRoutineOverlap,
   formatTime12Hour,
   normalizeTo24Hour,
-  calculateDayGaps
+  calculateDayGaps,
+  getIntervalsForBlock,
+  doBlocksOverlap,
+  checkSingleBlockConflict,
+  deduplicateRoutineBlocks,
+  getRoutineCoverageStatus
 } = require('../services/routineService');
 
 // GET /api/routines
@@ -148,10 +153,27 @@ router.post('/initial-setup', requireAuth, async (req, res) => {
     // 1. Validate & update schedule day settings
     const updatedSettings = await updateUserScheduleSettings(db, userId, { weekdays_days, weekends_days });
 
-    // 2. Validate all provided routine blocks first (atomically)
+    // 2. Validate all provided routine blocks (atomically with duplicate and overlap detection)
     const validBlocks = [];
-    if (Array.isArray(routines) && routines.length > 0) {
-      for (const r of routines) {
+    const seenExactKeys = new Set();
+    const rawList = Array.isArray(routines) ? routines : [];
+
+    // Filter exact duplicate items first (e.g. repeated click submissions of exact same block)
+    const deduplicatedInput = [];
+    for (const r of rawList) {
+      if (!r || !r.name) continue;
+      const start = normalizeTo24Hour((r.start_time || '').trim());
+      const end = normalizeTo24Hour((r.end_time || '').trim());
+      const grp = r.schedule_group === 'weekends' ? 'weekends' : 'weekdays';
+      const key = `${(r.name || '').trim().toLowerCase()}_${grp}_${start}_${end}`;
+      if (!seenExactKeys.has(key)) {
+        seenExactKeys.add(key);
+        deduplicatedInput.push(r);
+      }
+    }
+
+    if (deduplicatedInput.length > 0) {
+      for (const r of deduplicatedInput) {
         const name = (r.name || '').trim();
         const startTime = normalizeTo24Hour((r.start_time || '').trim());
         const endTime = normalizeTo24Hour((r.end_time || '').trim());
@@ -161,7 +183,6 @@ router.post('/initial-setup', requireAuth, async (req, res) => {
         if (!name || !startTime || !endTime) continue;
 
         const groupDays = group === 'weekdays' ? updatedSettings.weekdays_days : updatedSettings.weekends_days;
-
         const activityClass = (r.activity_classification || '').trim();
         const availType = r.availability_type || (name.toLowerCase().includes('available') ? 'available' : (type === 'Flexible' ? 'flexible' : 'busy'));
         const isReviewed = r.is_reviewed !== undefined ? (r.is_reviewed ? 1 : 0) : 1;
@@ -204,33 +225,38 @@ router.post('/initial-setup', requireAuth, async (req, res) => {
       }
     }
 
-    // 3. Atomically replace routine blocks for this user
-    if (Array.isArray(routines)) {
-      await db.prepare('DELETE FROM routines WHERE user_id = ?').run(userId);
-    }
+    // 3. Atomically replace routine blocks via db.batch() in a single transaction
+    const batchStatements = [
+      {
+        sql: 'DELETE FROM routines WHERE user_id = ?',
+        args: [userId]
+      }
+    ];
 
     const insertedRoutines = [];
+    const now = new Date().toISOString();
+
     for (const b of validBlocks) {
       const routineId = `r-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-      const now = new Date().toISOString();
-      await db.prepare(`
-        INSERT INTO routines (id, user_id, name, start_time, end_time, days, schedule_group, type, activity_classification, availability_type, is_reviewed, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        routineId,
-        userId,
-        b.name,
-        b.start_time,
-        b.end_time,
-        JSON.stringify(b.days),
-        b.schedule_group,
-        b.type,
-        b.activity_classification || '',
-        b.availability_type || 'busy',
-        b.is_reviewed !== undefined ? b.is_reviewed : 1,
-        now,
-        now
-      );
+      batchStatements.push({
+        sql: `INSERT INTO routines (id, user_id, name, start_time, end_time, days, schedule_group, type, activity_classification, availability_type, is_reviewed, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          routineId,
+          userId,
+          b.name,
+          b.start_time,
+          b.end_time,
+          JSON.stringify(b.days),
+          b.schedule_group,
+          b.type || 'Fixed',
+          b.activity_classification || '',
+          b.availability_type || 'busy',
+          b.is_reviewed !== undefined ? b.is_reviewed : 1,
+          now,
+          now
+        ]
+      });
 
       insertedRoutines.push({
         id: routineId,
@@ -240,21 +266,22 @@ router.post('/initial-setup', requireAuth, async (req, res) => {
         end_time: b.end_time,
         days: b.days,
         schedule_group: b.schedule_group,
-        type: b.type,
+        type: b.type || 'Fixed',
         activity_classification: b.activity_classification || '',
         availability_type: b.availability_type || 'busy',
         is_reviewed: b.is_reviewed !== undefined ? b.is_reviewed : 1
       });
     }
 
+    await db.batch(batchStatements);
+
     // 4. Mark setup status as completed
     await setInitialSetupStatus(db, userId, 'completed');
     const finalSettings = await getUserScheduleSettings(db, userId);
 
-    const allUserRoutines = (await db.prepare('SELECT * FROM routines WHERE user_id = ?').all(userId)) || [];
     const coverage = {
-      weekdays: calculateDayGaps(allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekdays')),
-      weekends: calculateDayGaps(allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekends'))
+      weekdays: calculateDayGaps(insertedRoutines.filter((r) => r.schedule_group === 'weekdays')),
+      weekends: calculateDayGaps(insertedRoutines.filter((r) => r.schedule_group === 'weekends'))
     };
 
     return res.status(200).json({
@@ -303,7 +330,21 @@ router.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'At least one applicable day must be assigned to this schedule group.' });
   }
 
-  // Conflict / Overlap Detection
+  // 1. Group-level non-overlap & 24-hour total duration guard
+  const existingInGroup = (await db.prepare('SELECT * FROM routines WHERE user_id = ? AND schedule_group = ?').all(userId, group)) || [];
+  const singleConflict = checkSingleBlockConflict(existingInGroup, {
+    name: routineName,
+    start_time: startTime,
+    end_time: endTime
+  });
+  if (singleConflict.hasConflict) {
+    return res.status(409).json({
+      error: singleConflict.message || 'This time slot overlaps an existing routine block.',
+      conflict: singleConflict
+    });
+  }
+
+  // 2. Cross-day / overnight 7-day overlap detection
   const overlapCheck = await checkRoutineOverlap(db, userId, {
     name: routineName,
     start_time: startTime,
@@ -315,7 +356,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   if (overlapCheck.hasOverlap) {
     return res.status(409).json({
-      error: overlapCheck.message || 'Routine block overlaps with an existing routine on the same day.',
+      error: overlapCheck.message || 'This time slot overlaps an existing routine block.',
       conflict: overlapCheck
     });
   }
@@ -356,6 +397,14 @@ router.post('/', requireAuth, async (req, res) => {
     parsedDays = normalizedDays;
   }
 
+  const allUserRoutines = (await db.prepare('SELECT * FROM routines WHERE user_id = ? ORDER BY start_time ASC').all(userId)) || [];
+  const weekdaysRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekdays');
+  const weekendsRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekends');
+  const coverage = {
+    weekdays: calculateDayGaps(weekdaysRoutines),
+    weekends: calculateDayGaps(weekendsRoutines)
+  };
+
   return res.status(201).json({
     success: true,
     routine: {
@@ -365,7 +414,9 @@ router.post('/', requireAuth, async (req, res) => {
       activity_classification: created.activity_classification || '',
       availability_type: created.availability_type || 'busy',
       is_reviewed: created.is_reviewed !== undefined ? created.is_reviewed : 1
-    }
+    },
+    routines: allUserRoutines,
+    coverage
   });
 });
 
@@ -415,7 +466,21 @@ router.put('/:id', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'At least one applicable day must be assigned to this schedule group.' });
   }
 
-  // Conflict / Overlap Detection (excluding self)
+  // 1. Group-level non-overlap & 24-hour total duration guard (excluding self)
+  const existingInGroup = (await db.prepare('SELECT * FROM routines WHERE user_id = ? AND schedule_group = ? AND id != ?').all(userId, updatedGroup, routineId)) || [];
+  const singleConflict = checkSingleBlockConflict(existingInGroup, {
+    name: updatedName,
+    start_time: updatedStart,
+    end_time: updatedEnd
+  });
+  if (singleConflict.hasConflict) {
+    return res.status(409).json({
+      error: singleConflict.message || 'This time slot overlaps an existing routine block.',
+      conflict: singleConflict
+    });
+  }
+
+  // 2. Conflict / Overlap Detection (excluding self across 7-day schedule)
   const overlapCheck = await checkRoutineOverlap(
     db,
     userId,
@@ -432,7 +497,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 
   if (overlapCheck.hasOverlap) {
     return res.status(409).json({
-      error: overlapCheck.message || 'Routine block overlaps with an existing routine on the same day.',
+      error: overlapCheck.message || 'This time slot overlaps an existing routine block.',
       conflict: overlapCheck
     });
   }
@@ -468,6 +533,14 @@ router.put('/:id', requireAuth, async (req, res) => {
     parsedDays = normalizedDays;
   }
 
+  const allUserRoutines = (await db.prepare('SELECT * FROM routines WHERE user_id = ? ORDER BY start_time ASC').all(userId)) || [];
+  const weekdaysRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekdays');
+  const weekendsRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekends');
+  const coverage = {
+    weekdays: calculateDayGaps(weekdaysRoutines),
+    weekends: calculateDayGaps(weekendsRoutines)
+  };
+
   return res.status(200).json({
     success: true,
     routine: {
@@ -477,7 +550,9 @@ router.put('/:id', requireAuth, async (req, res) => {
       activity_classification: updated.activity_classification || '',
       availability_type: updated.availability_type || 'busy',
       is_reviewed: updated.is_reviewed !== undefined ? updated.is_reviewed : 1
-    }
+    },
+    routines: allUserRoutines,
+    coverage
   });
 });
 
@@ -499,9 +574,19 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
   await db.prepare('DELETE FROM routines WHERE id = ? AND user_id = ?').run(routineId, userId);
 
+  const allUserRoutines = (await db.prepare('SELECT * FROM routines WHERE user_id = ? ORDER BY start_time ASC').all(userId)) || [];
+  const weekdaysRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekdays');
+  const weekendsRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekends');
+  const coverage = {
+    weekdays: calculateDayGaps(weekdaysRoutines),
+    weekends: calculateDayGaps(weekendsRoutines)
+  };
+
   return res.status(200).json({
     success: true,
-    message: 'Routine deleted successfully.'
+    message: 'Routine deleted successfully.',
+    routines: allUserRoutines,
+    coverage
   });
 });
 
@@ -517,7 +602,6 @@ router.post('/copy-group', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Source and target schedule groups must be different.' });
   }
 
-  const { getUserScheduleSettings, getRoutineCoverageStatus } = require('../services/routineService');
   const settings = await getUserScheduleSettings(db, userId);
   const targetDays = toGroup === 'weekends' ? settings.weekends_days : settings.weekdays_days;
 
@@ -531,36 +615,48 @@ router.post('/copy-group', requireAuth, async (req, res) => {
     return res.status(400).json({ error: `No routine blocks found in ${fromGroup} to copy.` });
   }
 
-  // Delete existing routines in target group for clean 1-click replicate
-  await db.prepare('DELETE FROM routines WHERE user_id = ? AND schedule_group = ?').run(userId, toGroup);
+  // Deduplicate and validate source routine blocks
+  const cleanSource = deduplicateRoutineBlocks(sourceRoutines);
+  if (!cleanSource || cleanSource.length === 0) {
+    return res.status(400).json({ error: `No valid routine blocks found in ${fromGroup} to copy.` });
+  }
+
+  // Atomically delete target group routines and insert copied blocks via db.batch()
+  const batchStatements = [
+    {
+      sql: 'DELETE FROM routines WHERE user_id = ? AND schedule_group = ?',
+      args: [userId, toGroup]
+    }
+  ];
 
   const copied = [];
   const daysJson = JSON.stringify(targetDays);
   const now = new Date().toISOString();
 
-  for (const r of sourceRoutines) {
+  for (const r of cleanSource) {
     const newId = `rt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    await db.prepare(`
-      INSERT INTO routines (
+    batchStatements.push({
+      sql: `INSERT INTO routines (
         id, user_id, name, start_time, end_time, days, type,
         schedule_group, activity_classification, availability_type, is_reviewed,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      newId,
-      userId,
-      r.name,
-      r.start_time,
-      r.end_time,
-      daysJson,
-      r.type,
-      toGroup,
-      r.activity_classification || '',
-      r.availability_type || 'busy',
-      r.is_reviewed !== undefined ? r.is_reviewed : 1,
-      now,
-      now
-    );
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        newId,
+        userId,
+        r.name,
+        r.start_time,
+        r.end_time,
+        daysJson,
+        r.type || 'Fixed',
+        toGroup,
+        r.activity_classification || '',
+        r.availability_type || 'busy',
+        r.is_reviewed !== undefined ? r.is_reviewed : 1,
+        now,
+        now
+      ]
+    });
 
     copied.push({
       id: newId,
@@ -569,7 +665,7 @@ router.post('/copy-group', requireAuth, async (req, res) => {
       start_time: r.start_time,
       end_time: r.end_time,
       days: targetDays,
-      type: r.type,
+      type: r.type || 'Fixed',
       schedule_group: toGroup,
       activity_classification: r.activity_classification || '',
       availability_type: r.availability_type || 'busy',
@@ -577,13 +673,23 @@ router.post('/copy-group', requireAuth, async (req, res) => {
     });
   }
 
+  await db.batch(batchStatements);
+
+  const allUserRoutines = (await db.prepare('SELECT * FROM routines WHERE user_id = ? ORDER BY start_time ASC').all(userId)) || [];
+  const weekdaysRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekdays');
+  const weekendsRoutines = allUserRoutines.filter((r) => (r.schedule_group || 'weekdays') === 'weekends');
+  const coverage = {
+    weekdays: calculateDayGaps(weekdaysRoutines),
+    weekends: calculateDayGaps(weekendsRoutines)
+  };
   const coverageStatus = await getRoutineCoverageStatus(db, userId);
 
   return res.status(200).json({
     success: true,
     count: copied.length,
     copied_count: copied.length,
-    routines: copied,
+    routines: allUserRoutines,
+    coverage,
     coverage_status: coverageStatus,
     message: `Successfully copied ${copied.length} routine blocks from ${fromGroup} to ${toGroup}.`
   });

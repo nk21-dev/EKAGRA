@@ -695,6 +695,130 @@ function calculateIntervalDuration(startTime, endTime) {
   return (1440 - s) + e;
 }
 
+/**
+ * Break a routine block down into 1 or 2 occupied intervals in [0, 1440) minutes.
+ * Handles overnight blocks (e.g. 23:00 to 07:00 -> [1380, 1440) and [0, 420)).
+ */
+function getIntervalsForBlock(startTime, endTime) {
+  const start = parseTimeToMinutes(startTime);
+  const end = parseTimeToMinutes(endTime);
+  if (start === null || end === null || start === end) return [];
+  if (start < end) {
+    return [{ start, end }];
+  } else {
+    return [
+      { start, end: 1440 },
+      { start: 0, end }
+    ];
+  }
+}
+
+/**
+ * Returns true if two routine blocks overlap in time within the same schedule group.
+ * Overlap exists if max(start1, start2) < min(end1, end2) for any pair of intervals.
+ * Adjacent blocks touching at exact boundary (e.g. 08:00 and 08:00) do NOT overlap.
+ */
+function doBlocksOverlap(b1, b2) {
+  const ints1 = getIntervalsForBlock(b1.start_time, b1.end_time);
+  const ints2 = getIntervalsForBlock(b2.start_time, b2.end_time);
+  for (const i1 of ints1) {
+    for (const i2 of ints2) {
+      if (Math.max(i1.start, i2.start) < Math.min(i1.end, i2.end)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Validates whether a candidate block conflicts with existing blocks in a schedule group:
+ * - Checks for identical or overlapping time intervals.
+ * - Ensures total group duration does not exceed 24 hours (1440 minutes).
+ */
+function checkSingleBlockConflict(existingBlocks, candidateBlock, excludeId = null) {
+  const cStart = normalizeTo24Hour(candidateBlock.start_time || '');
+  const cEnd = normalizeTo24Hour(candidateBlock.end_time || '');
+  if (!cStart || !cEnd || cStart === cEnd) {
+    return { hasConflict: true, message: 'Invalid start or end time.' };
+  }
+
+  const candidate = { ...candidateBlock, start_time: cStart, end_time: cEnd };
+  let currentGroupMinutes = 0;
+
+  for (const ex of existingBlocks) {
+    if (excludeId && ex.id === excludeId) continue;
+    const exStart = normalizeTo24Hour(ex.start_time);
+    const exEnd = normalizeTo24Hour(ex.end_time);
+    currentGroupMinutes += calculateIntervalDuration(exStart, exEnd);
+
+    if (doBlocksOverlap(candidate, { start_time: exStart, end_time: exEnd })) {
+      const exName = ex.name ? `"${ex.name}"` : 'an existing routine';
+      const cName = candidate.name ? `"${candidate.name}"` : 'Routine';
+      return {
+        hasConflict: true,
+        conflictingRoutine: ex,
+        message: `Overlap detected: ${cName} (${formatTime12Hour(cStart)}–${formatTime12Hour(cEnd)}) conflicts with ${exName} (${formatTime12Hour(exStart)}–${formatTime12Hour(exEnd)}). Please adjust the times.`
+      };
+    }
+  }
+
+  const candDuration = calculateIntervalDuration(cStart, cEnd);
+  if (currentGroupMinutes + candDuration > 1440) {
+    return {
+      hasConflict: true,
+      message: `Total routine duration cannot exceed 24 hours (1440 minutes). Current: ${currentGroupMinutes}m, Adding: ${candDuration}m.`
+    };
+  }
+
+  return { hasConflict: false };
+}
+
+/**
+ * Deduplicates and validates routine blocks for a single schedule group:
+ * 1. Discards empty/invalid items.
+ * 2. Normalizes 24-hour time strings.
+ * 3. Removes exact duplicate time slots, keeping the first occurrence.
+ * 4. Filters out overlapping blocks, preserving earlier non-conflicting ones.
+ * 5. Guarantees total duration <= 1440 minutes (24 hours).
+ */
+function deduplicateRoutineBlocks(blocksList) {
+  if (!Array.isArray(blocksList) || blocksList.length === 0) return [];
+  const result = [];
+  const seenExact = new Set();
+
+  for (const block of blocksList) {
+    if (!block || !block.name) continue;
+    const startTime = normalizeTo24Hour(block.start_time || '');
+    const endTime = normalizeTo24Hour(block.end_time || '');
+    if (!startTime || !endTime || startTime === endTime) continue;
+
+    const key = `${startTime}-${endTime}`;
+    if (seenExact.has(key)) continue;
+
+    const candidate = { ...block, start_time: startTime, end_time: endTime };
+    const overlaps = result.some((accepted) => doBlocksOverlap(candidate, accepted));
+    if (overlaps) {
+      continue;
+    }
+
+    seenExact.add(key);
+    result.push(candidate);
+  }
+
+  let totalMins = 0;
+  const finalBlocks = [];
+  for (const b of result) {
+    const dur = calculateIntervalDuration(b.start_time, b.end_time);
+    if (totalMins + dur <= 1440) {
+      totalMins += dur;
+      finalBlocks.push(b);
+    }
+  }
+
+  return finalBlocks;
+}
+
 function calculateDayGaps(routinesList) {
   if (!Array.isArray(routinesList) || routinesList.length === 0) {
     return {
@@ -1068,6 +1192,10 @@ module.exports = {
   checkRoutineOverlapAsync,
   minutesToTime24,
   calculateIntervalDuration,
+  getIntervalsForBlock,
+  doBlocksOverlap,
+  checkSingleBlockConflict,
+  deduplicateRoutineBlocks,
   calculateDayGaps,
   isRoutineCoverageComplete,
   getRoutineCoverageStatus,

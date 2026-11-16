@@ -185,7 +185,16 @@ class TursoDatabaseWrapper {
   }
 
   async batch(statements, mode = 'deferred') {
-    return await this.client.batch(statements, mode);
+    const cleanStatements = (statements || []).map((stmt) => {
+      if (typeof stmt === 'string') return stmt;
+      if (stmt && stmt.sql) {
+        const flatArgs = (stmt.args && Array.isArray(stmt.args)) ? stmt.args : [];
+        const cleanArgs = flatArgs.map((v) => (v === undefined ? null : v));
+        return { sql: stmt.sql, args: cleanArgs };
+      }
+      return stmt;
+    });
+    return await this.client.batch(cleanStatements, mode);
   }
 
   all(sql, ...args) {
@@ -266,6 +275,32 @@ function getDatabase(customPath = null) {
   }
   if (!db.run) {
     db.run = (sql, ...args) => db.prepare(sql).run(...args);
+  }
+  if (!db.batch) {
+    db.batch = async (statements, mode = 'deferred') => {
+      if (!Array.isArray(statements) || statements.length === 0) return [];
+      db.exec('BEGIN TRANSACTION;');
+      try {
+        const results = [];
+        for (const stmt of statements) {
+          if (typeof stmt === 'string') {
+            db.exec(stmt);
+            results.push({ rowsAffected: 0, rows: [] });
+          } else {
+            const prep = db.prepare(stmt.sql);
+            const flatArgs = (stmt.args && Array.isArray(stmt.args)) ? stmt.args : [];
+            const cleanArgs = flatArgs.map((v) => (v === undefined ? null : v));
+            const info = prep.run(...cleanArgs);
+            results.push({ rowsAffected: info.changes, lastInsertRowid: info.lastInsertRowid });
+          }
+        }
+        db.exec('COMMIT;');
+        return results;
+      } catch (err) {
+        try { db.exec('ROLLBACK;'); } catch (_) {}
+        throw err;
+      }
+    };
   }
 
   if (!customPath) {
